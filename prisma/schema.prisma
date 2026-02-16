@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Restaurant {
+  id               String   @id @default(uuid())
+  name             String
+  address          String?
+  formattedAddress String?  @map("formatted_address")
+  latitude         Float?
+  longitude        Float?
+
+  // Source info
+  sourceUrl      String?  @map("source_url")
+  sourcePlatform String?  @map("source_platform") // instagram, rednote, tiktok
+  rawCaption     String?  @map("raw_caption")
+
+  // Google Places (enriched from import)
+  googlePlaceId    String?  @unique @map("google_place_id")
+  photoReferences  String[] @default([]) @map("photo_references") // Up to 5 photo references from Place Details; use with /api/places/photo
+  openingHoursWeekdayText String[] @default([]) @map("opening_hours_weekday_text") // From Place Details opening_hours.weekday_text
+
+  // Extracted data
+  cuisineTypes    String[] @map("cuisine_types")
+  popularDishes   String[] @map("popular_dishes")
+  priceRange     String?  @map("price_range") // $, $$, $$$, $$$$
+  ambianceTags   String[] @map("ambiance_tags")
+
+  // Status
+  status          RestaurantStatus @default(WANT_TO_GO)
+  isBlacklisted   Boolean  @default(false) @map("is_blacklisted")
+  blacklistReason String?  @map("blacklist_reason")
+  blacklistedAt   DateTime? @map("blacklisted_at")
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  visits  Visit[]
+  photos  Photo[]
+  imports Import[]
+  groupRestaurants GroupRestaurant[]
+
+  @@map("restaurants")
+}
+
+model Group {
+  id          String   @id @default(uuid())
+  name        String
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  members     GroupMember[]
+  groupRestaurants GroupRestaurant[]
+  invites     GroupInvite[]
+
+  @@map("groups")
+}
+
+model GroupMember {
+  id        String   @id @default(uuid())
+  groupId   String   @map("group_id")
+  userId    String   @map("user_id")
+  role      String   @default("member")
+  joinedAt  DateTime @default(now()) @map("joined_at")
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@map("group_members")
+}
+
+model GroupRestaurant {
+  id           String   @id @default(uuid())
+  groupId      String   @map("group_id")
+  restaurantId String   @map("restaurant_id")
+  addedById    String   @map("added_by_id")
+  addedAt      DateTime @default(now()) @map("added_at")
+  group        Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, restaurantId])
+  @@map("group_restaurants")
+}
+
+model GroupInvite {
+  id        String   @id @default(uuid())
+  groupId   String   @map("group_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  usedById  String?  @map("used_by_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@map("group_invites")
+}
+
+model Import {
+  id           String   @id @default(uuid())
+  sourceUrl    String?  @map("source_url")   // Original link user pasted (null if caption-only)
+  importedAt   DateTime @default(now()) @map("imported_at")
+  restaurantId String   @map("restaurant_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("imports")
+}
+
+model Visit {
+  id           String   @id @default(uuid())
+  restaurantId String   @map("restaurant_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  visitDate DateTime @map("visit_date")
+
+  // PF Ratio components
+  fullnessScore Int   @map("fullness_score") // 1-10
+  tasteScore    Int   @map("taste_score")    // 1-10
+  pricePaid     Float @map("price_paid")
+  pfRatio       Float @map("pf_ratio")       // Calculated: (fullness * taste) / price
+
+  // Additional ratings
+  serviceRating  Int? @map("service_rating")  // 1-5
+  ambianceRating Int? @map("ambiance_rating")  // 1-5
+
+  notes String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("visits")
+}
+
+model Photo {
+  id           String   @id @default(uuid())
+  restaurantId String   @map("restaurant_id")
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  url       String
+  caption   String?
+  uploadedAt DateTime @default(now()) @map("uploaded_at")
+
+  @@map("photos")
+}
+
+enum RestaurantStatus {
+  WANT_TO_GO
+  VISITED
+  FAVORITE
+  WARNING_ZONE
+}

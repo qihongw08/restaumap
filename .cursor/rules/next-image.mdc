@@ -1,0 +1,19 @@
+---
+description: Use Next.js Image component instead of raw img for better LCP and bandwidth
+alwaysApply: true
+---
+
+# Use Next.js Image for images
+
+- **Always use** `import Image from 'next/image'` and `<Image />` instead of `<img>`.
+- Provide `width` and `height` (or use `fill` with a sized parent) so layout is stable.
+- Use `alt` for accessibility; use `alt=""` only when the image is decorative.
+- Add new image origins to `next.config` under `images.remotePatterns` or `images.localPatterns` when needed.
+
+```tsx
+// ❌ Avoid
+<img src={url} alt="Thumbnail" className="rounded-lg" />
+
+// ✅ Prefer
+<Image src={url} alt="Thumbnail" width={56} height={56} className="rounded-lg object-cover" />
+```
