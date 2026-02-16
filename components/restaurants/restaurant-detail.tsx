@@ -54,6 +54,7 @@ export function RestaurantDetail({ restaurant }: RestaurantDetailProps) {
           alt={restaurant.name}
           width={800}
           height={450}
+          unoptimized={mainPhotoSrc.startsWith("/api/places/photo")}
           className="h-full w-full object-cover"
         />
         {photoRefs.length > 1 && (
@@ -75,6 +76,7 @@ export function RestaurantDetail({ restaurant }: RestaurantDetailProps) {
                   alt=""
                   width={48}
                   height={48}
+                  unoptimized
                   className="h-full w-full object-cover"
                 />
               </button>

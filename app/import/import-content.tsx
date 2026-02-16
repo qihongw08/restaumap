@@ -255,6 +255,7 @@ export function ImportContent() {
                                 alt=""
                                 width={56}
                                 height={56}
+                                unoptimized
                                 className="h-14 w-14 rounded-xl object-cover shrink-0"
                               />
                             )}

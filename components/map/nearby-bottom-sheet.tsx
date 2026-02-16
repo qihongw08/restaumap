@@ -313,6 +313,7 @@ export function NearbyBottomSheet({
                       alt={res.name}
                       width={96}
                       height={96}
+                      unoptimized={!!res.photoReferences?.[0]}
                       className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700"
                     />
                   </div>

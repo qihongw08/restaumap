@@ -61,6 +61,7 @@ export function RestaurantCard({ restaurant, onRemove }: RestaurantCardProps) {
               alt={restaurant.name}
               width={400}
               height={250}
+              unoptimized={src.startsWith("/api/places/photo")}
               className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
               style={{
                 transform: `translateX(${(i - currentIndex) * 100}%)`,
