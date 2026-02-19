@@ -4,23 +4,37 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
-const EXTRACT_SYSTEM = `You are given text that may be scraped page content (markdown) or a pasted caption. Your job is to output structured restaurant information.
+const EXTRACT_SYSTEM = `You are given raw text extracted from a social media post (Instagram, TikTok, RedNote/Xiaohongshu). 
+    Your task is to extract restaurant information, not user or creator information.
 
-Steps:
-1. Identify the restaurant name and any rough location from the text (city, neighborhood, street, or full address). These are your anchors.
-2. Fetch the restaurant using that name and location, fill the output. Do not rely only on what is explicitly in the text: use your knowledge to look up or infer details about this restaurant (or similar places in that area). For example, if the text only gives a name and city, infer plausible cuisine type, price range, and ambiance from what you know about the restaurant or the area. Prefer information stated in the text when present; otherwise infer sensibly.
-3. Output valid JSON only, no markdown or explanation. Use English for all fields (translate if the source is in another language).
+    Important rules:
+    1. First, translate all non-English text into English.
+    2.Identify the restaurant name by prioritizing:
+    3. Phrases that indicate visiting, eating at, or checking in (e.g. “went to”, “checked in”, “打卡”, “吃了”, “新开业”).
+    4. Names that appear after location indicators (city/neighborhood names).
 
-Exact JSON structure:
-{
-  "name": "restaurant name",
-  "address": "full address if known, else city/area or null",
-  "cuisineTypes": ["array", "of", "cuisines"],
-  "popularDishes": ["array", "of", "popular dishes"],
-  "priceRange": "$" | "$$" | "$$$" | "$$$$" or null,
-  "ambianceTags": ["array", "of", "tags like cozy, date night"]
-}
-Use null or empty array only when you cannot infer a value. Always set name.`;
+    Do NOT treat usernames, account names, or authors as restaurant names, even if they appear prominently or repeatedly.
+    If a personal name or handle appears (e.g. above the post or near profile info), assume it is NOT the restaurant unless the text explicitly states it is a restaurant.
+    After identifying the restaurant name and rough location (city, neighborhood, street, or address), use your general knowledge to infer:
+    - Cuisine type
+    - Typical price range
+    - Common or likely popular dishes
+    - Ambiance
+
+    Prefer information explicitly stated in the text. If missing, infer conservatively based on the restaurant name, cuisine, and area.
+    Output valid JSON only, no explanation, no markdown.
+
+    Exact JSON structure:
+    {
+    "name": "restaurant name",
+    "address": "full address if known, else city/area or null",
+    "cuisineTypes": ["array", "of", "cuisines"],
+    "popularDishes": ["array", "of", "popular dishes"],
+    "priceRange": "$" | "$$" | "$$$" | "$$$$" | null,
+    "ambianceTags": ["array", "of", "tags"]
+    }
+
+    Always set "name".`;
 
 export interface ExtractedRestaurant {
   name: string;
@@ -35,12 +49,14 @@ export async function extractRestaurantFromText(
   text: string,
 ): Promise<ExtractedRestaurant> {
   const completion = await groq.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
-    messages: [
-      { role: "system", content: EXTRACT_SYSTEM },
-      { role: "user", content: text },
-    ],
-    temperature: 0.2,
+    model: "groq/compound",
+    messages: [{ role: "user", content: EXTRACT_SYSTEM + "\n\n" + text }],
+    temperature: 1,
+    compound_custom: {
+      tools: {
+        enabled_tools: ["web_search", "code_interpreter", "visit_website"],
+      },
+    },
   });
 
   let content = completion.choices[0]?.message?.content?.trim();

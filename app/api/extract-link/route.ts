@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { extractRestaurantFromText } from "@/lib/groq";
-import { fetchWebpageContent, isFetchableUrl } from "@/lib/anchorbrowser";
 
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
@@ -17,11 +16,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const textForExtraction = isFetchableUrl(raw)
-      ? await fetchWebpageContent(raw)
-      : raw;
-
-    const extracted = await extractRestaurantFromText(textForExtraction);
+    const extracted = await extractRestaurantFromText(raw);
     return NextResponse.json({ data: extracted });
   } catch (error) {
     console.error("Extract link error:", error);
