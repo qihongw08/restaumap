@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
     }
 
     const candidates = await searchPlaces(query);
+    console.log("candidates: ", candidates);
     return NextResponse.json({ data: candidates });
   } catch (error) {
     console.error("Places search error:", error);

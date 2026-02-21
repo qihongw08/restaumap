@@ -37,9 +37,11 @@ export async function POST(request: NextRequest) {
 
     let restaurantId: string;
     const rawFormatted =
-      typeof extracted.formattedAddress === "string"
-        ? extracted.formattedAddress
-        : address;
+      typeof body.formattedAddress === "string"
+        ? body.formattedAddress
+        : typeof extracted.formattedAddress === "string"
+          ? extracted.formattedAddress
+          : address;
     const formattedAddress: string | null = rawFormatted ?? null;
     const latitude: number | null =
       typeof body.latitude === "number" ? body.latitude : null;

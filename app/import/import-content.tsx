@@ -25,6 +25,9 @@ type PlaceCandidate = {
   name: string;
   formattedAddress: string;
   photoReference: string | null;
+  photoReferences?: string[];
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 function isUrl(s: string): boolean {
@@ -118,12 +121,26 @@ export function ImportContent() {
     try {
       const sourceUrl =
         extractUrl(text) ?? (isUrl(text.trim()) ? text.trim() : null);
+      const selectedCandidate =
+        selectedPlaceId && placesCandidates?.length
+          ? placesCandidates.find((c) => c.placeId === selectedPlaceId)
+          : null;
+
       const res = await fetch("/api/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sourceUrl,
           placeId: selectedPlaceId,
+          ...(selectedCandidate && {
+            latitude: selectedCandidate.latitude ?? undefined,
+            longitude: selectedCandidate.longitude ?? undefined,
+            photoReferences: selectedCandidate.photoReferences ?? [],
+            formattedAddress:
+              selectedCandidate.formattedAddress ??
+              extracted.formattedAddress ??
+              extracted.address,
+          }),
           extracted: {
             name: extracted.name,
             address: extracted.address,
