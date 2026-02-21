@@ -40,8 +40,6 @@ export function normalizeInstagramUrl(url: string): string | null {
 
 export type InstagramCaptionResult = {
   caption: string | null;
-  location?: string | null;
-  author_name?: string;
   shortcode?: string;
   error?: string;
 };
@@ -55,7 +53,13 @@ const X_IG_APP_ID = "936619743392459";
  */
 export async function getInstagramCaption(
   instagramUrl: string,
+  maxRetries: number = 2,
+  currentRetry: number = 0,
 ): Promise<InstagramCaptionResult> {
+  if (currentRetry >= maxRetries) {
+    return { caption: null, error: "Max retries reached" };
+  }
+
   const normalized = normalizeInstagramUrl(instagramUrl);
   const url = normalized ?? instagramUrl.trim();
   const shortcode = getInstagramId(url);
@@ -88,30 +92,50 @@ export async function getInstagramCaption(
     });
 
     const contentType = response.headers.get("content-type") ?? "";
-    if (!contentType.includes("application/json")) {
+    const isLikelyJson =
+      contentType.includes("application/json") ||
+      contentType.includes("text/javascript");
+
+    if (!response.ok) {
+      return await getInstagramCaption(
+        instagramUrl,
+        maxRetries,
+        currentRetry + 1,
+      );
+    }
+
+    if (!isLikelyJson) {
       return {
         caption: null,
-        error: "Instagram returned non-JSON (likely login wall or block)",
+        error: "Instagram returned non-JSON; caption unavailable",
       };
     }
 
-    const json = (await response.json()) as {
+    const text = await response.text();
+    let json: {
       data?: {
         xdt_shortcode_media?: {
           edge_media_to_caption?: {
             edges?: Array<{ node?: { text?: string } }>;
           };
-          location?: { name?: string };
         };
       };
     };
+    try {
+      json = JSON.parse(text) as typeof json;
+    } catch {
+      return await getInstagramCaption(
+        instagramUrl,
+        maxRetries,
+        currentRetry + 1,
+      );
+    }
 
     const media = json?.data?.xdt_shortcode_media;
     const caption =
       media?.edge_media_to_caption?.edges?.[0]?.node?.text ?? null;
-    const location = media?.location?.name ?? null;
 
-    return { caption, location, shortcode };
+    return { caption, shortcode };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { caption: null, error: message };

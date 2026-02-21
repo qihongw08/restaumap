@@ -148,7 +148,7 @@ export async function extractRestaurantFromXiaohongshu(
   const step1Content = await compoundMini(
     XIAOHONGSHU_STEP1_SYSTEM,
     "Input (post content or link):\n" + text,
-    "web_search",
+    undefined,
   );
   const { name, roughLocation } = parseStep1Result(step1Content);
 

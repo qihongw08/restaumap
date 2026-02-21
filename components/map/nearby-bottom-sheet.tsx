@@ -7,7 +7,6 @@ import {
   Search,
   ChevronUp,
   ChevronDown,
-  Star,
   Clock,
   DollarSign,
   UtensilsCrossed,
@@ -16,7 +15,6 @@ import {
   Flame,
   Coffee,
   IceCream,
-  MapPin,
 } from "lucide-react";
 import type { RestaurantWithDetails } from "@/types/restaurant";
 import { useLocation } from "@/hooks/use-location";
@@ -52,6 +50,24 @@ function getTodaysHours(weekdayText: string[] | undefined): string | null {
   const jsDay = new Date().getDay();
   const index = (jsDay + 6) % 7;
   return weekdayText[index] ?? null;
+}
+
+function getOpenUntil(weekdayText: string[] | undefined): string | null {
+  const line = getTodaysHours(weekdayText);
+  if (!line) return null;
+  const afterColon = line.includes(":")
+    ? line.slice(line.indexOf(":") + 1).trim()
+    : line;
+  if (!afterColon || /closed/i.test(afterColon)) return "Closed";
+  const ranges = afterColon.split(/[,，]/).map((r) => r.trim());
+  const lastRange = ranges[ranges.length - 1];
+  const dash = lastRange.match(/\s+[–-]\s+/);
+  if (!dash) return null;
+  const closing = lastRange
+    .slice((dash.index ?? 0) + (dash[0]?.length ?? 0))
+    .trim();
+  if (!closing) return null;
+  return `Open until ${closing}`;
 }
 
 function calculateDistance(
@@ -283,11 +299,9 @@ export function NearbyBottomSheet({
             )}
           </div>
         </div>
-
-        {/* Results List */}
-        <div className="flex-1 overflow-y-auto px-6 pb-20 custom-scrollbar">
-          <div className="space-y-5">
-            <div className="flex items-center justify-between sticky top-0 bg-transparent backdrop-blur-sm py-2">
+        <div className="flex-1 min-w-0 overflow-y-auto px-6 pb-20 custom-scrollbar">
+          <div className="min-w-0 space-y-5">
+            <div className="sticky top-0 z-10 -mx-6 flex items-center justify-between border-b border-border/50 bg-card/95 px-6 py-2 backdrop-blur-sm">
               <h3 className="text-xs font-black italic tracking-tighter text-muted-foreground/60 uppercase">
                 {filteredRestaurants.length} Restaurants Found
               </h3>
@@ -304,13 +318,13 @@ export function NearbyBottomSheet({
                   type="button"
                   onClick={() => onRestaurantClick?.(res.id)}
                   className={cn(
-                    "group relative flex w-full flex-col gap-4 p-5 rounded-[2.5rem] bg-background/40 border transition-all active:scale-[0.98] shadow-sm text-left",
+                    "group relative flex w-full min-w-0 flex-col gap-4 p-5 rounded-[2.5rem] bg-background/40 border transition-all active:scale-[0.98] shadow-sm text-left overflow-hidden",
                     highlightedRestaurantId === res.id
                       ? "border-primary ring-2 ring-primary/50 bg-primary/5"
                       : "border-primary/5 hover:border-primary/40 hover:bg-muted/80",
                   )}
                 >
-                  <div className="flex items-center gap-5">
+                  <div className="flex min-w-0 items-center gap-5">
                     <div className="h-24 w-24 rounded-3xl bg-muted overflow-hidden flex-shrink-0 border-2 border-primary/10 group-hover:border-primary shadow-lg ring-4 ring-primary/5">
                       <Image
                         src={
@@ -328,14 +342,13 @@ export function NearbyBottomSheet({
 
                     <div className="flex-1 min-w-0 flex flex-col gap-1.5">
                       <div className="flex items-start justify-between gap-2">
-                        <h4 className="text-lg font-black italic tracking-tighter text-foreground uppercase truncate group-hover:text-primary transition-colors">
+                        <h4 className="text-md font-black italic tracking-tighter text-foreground uppercase truncate group-hover:text-primary transition-colors">
                           {res.name}
                         </h4>
                         {res.distance != null && (
-                          <div className="flex items-center gap-1 shrink-0 bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
-                            <MapPin className="h-3 w-3 text-primary" />
-                            <span className="text-[10px] font-black text-primary uppercase">
-                              {res.distance.toFixed(1)} Miles
+                          <div className="flex min-w-0 max-w-[40%] items-center gap-1 overflow-hidden bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
+                            <span className="truncate text-[10px] font-black text-primary uppercase">
+                              {res.distance.toFixed(1)} MI
                             </span>
                           </div>
                         )}
@@ -345,22 +358,18 @@ export function NearbyBottomSheet({
                           {res.formattedAddress ?? res.address}
                         </p>
                       )}
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1 text-primary">
-                          <Star className="h-3 w-3 fill-primary" />
-                          <span className="text-xs font-black">4.8</span>
-                        </div>
-                        <span className="h-1 w-1 rounded-full bg-muted" />
-                        <p className="text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground truncate">
+                      <div className="flex items-center gap-2">
+                        <UtensilsCrossed className="h-3 w-3 shrink-0 text-muted-foreground" />
+                        <p className="text-[10px] font-black uppercase text-muted-foreground truncate">
                           {res.cuisineTypes?.[0] || "Gourmet"} •{" "}
                           {res.priceRange || "—"}
                         </p>
                       </div>
-                      {getTodaysHours(res.openingHoursWeekdayText) && (
+                      {getOpenUntil(res.openingHoursWeekdayText) && (
                         <div className="flex items-center gap-2 text-muted-foreground mt-1">
                           <Clock className="h-3 w-3 shrink-0" />
-                          <span className="text-[10px] font-black uppercase tracking-widest truncate">
-                            {getTodaysHours(res.openingHoursWeekdayText)}
+                          <span className="text-[10px] font-black uppercase truncate">
+                            {getOpenUntil(res.openingHoursWeekdayText)}
                           </span>
                         </div>
                       )}

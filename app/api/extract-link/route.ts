@@ -44,7 +44,15 @@ export async function POST(request: NextRequest) {
     if (isInstagramUrl(raw)) {
       const normalized = normalizeInstagramUrl(raw) ?? raw;
       const result = await getInstagramCaption(normalized);
-      const text = result.caption?.trim() ?? normalized;
+      const text = result.caption?.trim();
+
+      if (!text) {
+        return NextResponse.json(
+          { error: "Could not extract caption from Instagram post" },
+          { status: 400 },
+        );
+      }
+
       const extracted = await withRetry(() =>
         extractRestaurantFromInstagram(text),
       );
