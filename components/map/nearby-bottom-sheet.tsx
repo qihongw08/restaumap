@@ -313,6 +313,7 @@ export function NearbyBottomSheet({
                 ref={(el) => {
                   cardRefs.current[res.id] = el;
                 }}
+                className="min-w-0"
               >
                 <button
                   type="button"
@@ -340,9 +341,9 @@ export function NearbyBottomSheet({
                       />
                     </div>
 
-                    <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-                      <div className="flex items-start justify-between gap-2">
-                        <h4 className="text-md font-black italic tracking-tighter text-foreground uppercase truncate group-hover:text-primary transition-colors">
+                    <div className="flex-1 min-w-0 flex min-h-0 flex-col gap-1.5 overflow-hidden">
+                      <div className="flex min-w-0 items-start justify-between gap-2">
+                        <h4 className="min-w-0 flex-1 truncate text-md font-black italic tracking-tighter text-foreground uppercase group-hover:text-primary transition-colors">
                           {res.name}
                         </h4>
                         {res.distance != null && (
@@ -354,21 +355,21 @@ export function NearbyBottomSheet({
                         )}
                       </div>
                       {(res.formattedAddress ?? res.address) && (
-                        <p className="text-[10px] text-muted-foreground truncate">
+                        <p className="min-w-0 truncate text-[10px] text-muted-foreground">
                           {res.formattedAddress ?? res.address}
                         </p>
                       )}
-                      <div className="flex items-center gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
                         <UtensilsCrossed className="h-3 w-3 shrink-0 text-muted-foreground" />
-                        <p className="text-[10px] font-black uppercase text-muted-foreground truncate">
+                        <p className="min-w-0 flex-1 truncate text-[10px] font-black uppercase text-muted-foreground">
                           {res.cuisineTypes?.[0] || "Gourmet"} •{" "}
                           {res.priceRange || "—"}
                         </p>
                       </div>
                       {getOpenUntil(res.openingHoursWeekdayText) && (
-                        <div className="flex items-center gap-2 text-muted-foreground mt-1">
+                        <div className="flex min-w-0 items-center gap-2 text-muted-foreground mt-1">
                           <Clock className="h-3 w-3 shrink-0" />
-                          <span className="text-[10px] font-black uppercase truncate">
+                          <span className="min-w-0 flex-1 truncate text-[10px] font-black uppercase">
                             {getOpenUntil(res.openingHoursWeekdayText)}
                           </span>
                         </div>
