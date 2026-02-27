@@ -15,6 +15,8 @@ interface MapViewProps {
   highlightRestaurantId?: string | null;
   selectedGroupId?: string | null;
   groupOptions?: Array<{ id: string; name: string }>;
+  shareToken?: string | null;
+  showPhotos?: boolean;
 }
 
 export function MapView({
@@ -22,6 +24,8 @@ export function MapView({
   highlightRestaurantId = null,
   selectedGroupId = null,
   groupOptions = [],
+  shareToken = null,
+  showPhotos = true,
 }: MapViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -52,10 +56,18 @@ export function MapView({
     return () => clearTimeout(t);
   }, [highlightRestaurantId, restaurants]);
 
+  const getRestaurantHref = useCallback(
+    (id: string) =>
+      shareToken
+        ? `/restaurants/${id}?shareToken=${encodeURIComponent(shareToken)}`
+        : `/restaurants/${id}`,
+    [shareToken],
+  );
+
   const handleMarkerClick = useCallback(
     (id: string) => {
       if (selectedRestaurantId === id) {
-        router.push(`/restaurants/${id}`);
+        router.push(getRestaurantHref(id));
         return;
       }
       const rest = restaurants.find((r) => r.id === id);
@@ -66,7 +78,7 @@ export function MapView({
       setSelectedRestaurantId(id);
       setSheetOpen(true);
     },
-    [selectedRestaurantId, restaurants, router],
+    [selectedRestaurantId, restaurants, router, getRestaurantHref],
   );
 
   const handleCameraChange = useCallback(
@@ -83,7 +95,7 @@ export function MapView({
   const handleRestaurantClick = useCallback(
     (id: string) => {
       if (selectedRestaurantId === id) {
-        router.push(`/restaurants/${id}`);
+        router.push(getRestaurantHref(id));
         return;
       }
       const rest = restaurants.find((r) => r.id === id);
@@ -94,7 +106,7 @@ export function MapView({
       setSelectedRestaurantId(id);
       setSheetOpen(true);
     },
-    [selectedRestaurantId, restaurants, router],
+    [selectedRestaurantId, restaurants, router, getRestaurantHref],
   );
 
   const handleSheetOpenChange = (open: boolean) => {
@@ -180,6 +192,7 @@ export function MapView({
         isOpen={sheetOpen}
         onOpenChange={handleSheetOpenChange}
         onRestaurantClick={handleRestaurantClick}
+        showPhotos={showPhotos}
       />
     </>
   );

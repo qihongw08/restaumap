@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Plus, Download } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { ImportContent } from "@/app/import/import-content";
+import { ShareLinkButton } from "@/components/share/share-link-button";
 
 export function ImportButtons() {
   const [open, setOpen] = useState(false);
@@ -25,6 +26,13 @@ export function ImportButtons() {
         >
           <Download className="h-4 w-4" /> Import
         </button>
+      </div>
+      <div className="mt-3">
+        <ShareLinkButton
+          endpoint="/api/share/user"
+          label="Share"
+          className="w-full justify-center rounded-2xl border-2 border-border bg-background px-4 py-3 text-xs shadow-md"
+        />
       </div>
 
       <Modal

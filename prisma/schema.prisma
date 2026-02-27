@@ -77,6 +77,7 @@ model Group {
   members          GroupMember[]
   groupRestaurants GroupRestaurant[]
   invites          GroupInvite[]
+  shareLinks       ShareLink[]
   visits           Visit[]
 
   @@map("groups")
@@ -130,6 +131,23 @@ model Import {
   @@map("imports")
 }
 
+model ShareLink {
+  id            String        @id @default(uuid())
+  token         String        @unique
+  type          ShareLinkType
+  ownerUserId   String        @map("owner_user_id")
+  targetUserId  String?       @map("target_user_id")
+  targetGroupId String?       @map("target_group_id")
+  expiresAt     DateTime      @map("expires_at")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  targetGroup   Group?        @relation(fields: [targetGroupId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt], map: "share_links_expires_at_idx")
+  @@index([targetUserId], map: "share_links_target_user_id_idx")
+  @@index([targetGroupId], map: "share_links_target_group_id_idx")
+  @@map("share_links")
+}
+
 model Visit {
   id           String     @id @default(uuid())
   userId       String     @map("user_id")
@@ -174,4 +192,9 @@ enum RestaurantStatus {
   VISITED
   FAVORITE
   WARNING_ZONE
+}
+
+enum ShareLinkType {
+  USER_MAP
+  GROUP_MAP
 }

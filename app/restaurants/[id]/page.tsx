@@ -2,17 +2,44 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { RestaurantDetail } from "@/components/restaurants/restaurant-detail";
+import { PublicRestaurantDetail } from "@/components/restaurants/public-restaurant-detail";
+import { getSharedRestaurantForToken, resolveShareLink } from "@/lib/share";
 import type { RestaurantStatus } from "@prisma/client";
 
 export default async function RestaurantDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ shareToken?: string }>;
 }) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
-
   const { id } = await params;
+  const query = await searchParams;
+  const shareToken =
+    typeof query.shareToken === "string" && query.shareToken.trim()
+      ? query.shareToken.trim()
+      : null;
+  const user = await getCurrentUser();
+  if (!user) {
+    if (!shareToken) redirect("/login");
+    const [sharedRestaurant, link] = await Promise.all([
+      getSharedRestaurantForToken(shareToken, id),
+      resolveShareLink(shareToken),
+    ]);
+    if (!sharedRestaurant || !link) notFound();
+    const mapHref =
+      link.type === "GROUP_MAP"
+        ? `/share/g/${shareToken}?restaurant=${id}`
+        : `/share/u/${shareToken}?restaurant=${id}`;
+    return (
+      <div className="min-h-screen bg-background">
+        <main className="mx-auto max-w-lg">
+          <PublicRestaurantDetail restaurant={sharedRestaurant} mapHref={mapHref} />
+        </main>
+      </div>
+    );
+  }
+
   const userRestaurant = await prisma.userRestaurant.findUnique({
     where: { userId_restaurantId: { userId: user.id, restaurantId: id } },
     include: {

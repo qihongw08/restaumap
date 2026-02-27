@@ -1,9 +1,6 @@
 ---
-description: Prisma migrations - do not write migration files manually
-globs: prisma/**/*
-alwaysApply: false
+alwaysApply: true
 ---
-
 # Prisma migrations
 
 - **Do not manually create or edit migration SQL files** in `prisma/migrations/`.

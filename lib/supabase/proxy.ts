@@ -6,11 +6,19 @@ const PUBLIC_PATHS = [
   "/auth/callback",
   "/auth/auth-code-error",
   "/groups/join",
+  "/share",
 ];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
+  );
+}
+
+function isShareDetailRequest(request: NextRequest): boolean {
+  return (
+    request.nextUrl.pathname.startsWith("/restaurants/") &&
+    request.nextUrl.searchParams.has("shareToken")
   );
 }
 
@@ -50,6 +58,7 @@ export async function updateSession(request: NextRequest) {
     !pathname.startsWith("/_next") &&
     !pathname.includes(".") &&
     !isPublicPath(pathname) &&
+    !isShareDetailRequest(request) &&
     !data?.claims?.sub
   ) {
     const loginUrl = new URL("/login", request.url);

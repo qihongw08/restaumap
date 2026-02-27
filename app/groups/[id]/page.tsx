@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Nav } from "@/components/shared/nav";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
+import { ShareLinkButton } from "@/components/share/share-link-button";
 import {
   ChevronRight,
   Users,
@@ -321,27 +322,32 @@ export default function GroupDetailPage({
           />
         ) : (
           <>
-            <div className="mb-6 flex items-center justify-between">
+            <div className="mb-6 space-y-3">
               <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground">
                 Restaurants
               </h2>
-              <div className="flex items-center gap-2">
+              <div className="grid grid-cols-2 gap-2">
+                <ShareLinkButton
+                  endpoint={`/api/share/group/${groupId}`}
+                  label="Share"
+                  className="w-full justify-center rounded-xl border border-border bg-background px-3 py-2 text-xs shadow-none"
+                />
                 <Link
                   href={`/map?groupId=${groupId}`}
-                  className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs font-black uppercase tracking-widest text-foreground"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-xs font-black uppercase tracking-widest text-foreground"
                 >
                   <Map className="h-3.5 w-3.5" />
-                  View on map
+                  Open map
                 </Link>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => setAddRestaurantOpen(true)}
-                  className="gap-2"
-                >
-                  <Plus className="h-4 w-4" /> Add
-                </Button>
               </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setAddRestaurantOpen(true)}
+                className="w-full gap-2 rounded-xl py-2.5 text-xs font-black uppercase tracking-widest"
+              >
+                <Plus className="h-4 w-4" /> Add restaurant
+              </Button>
             </div>
 
             {group.groupRestaurants.length === 0 ? (

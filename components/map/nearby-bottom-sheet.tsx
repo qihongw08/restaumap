@@ -27,6 +27,7 @@ interface NearbyBottomSheetProps {
   onOpenChange?: (open: boolean) => void;
   /** First click: select and zoom to restaurant. Second click (same card): navigate to restaurant page. */
   onRestaurantClick?: (restaurantId: string) => void;
+  showPhotos?: boolean;
 }
 
 const CATEGORIES = [
@@ -95,6 +96,7 @@ export function NearbyBottomSheet({
   isOpen: controlledOpen,
   onOpenChange,
   onRestaurantClick,
+  showPhotos = true,
 }: NearbyBottomSheetProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled =
@@ -325,21 +327,28 @@ export function NearbyBottomSheet({
                       : "border-primary/5 hover:border-primary/40 hover:bg-muted/80",
                   )}
                 >
-                  <div className="grid min-w-0 grid-cols-[6rem_1fr] gap-5 items-start">
-                    <div className="h-24 w-24 rounded-3xl bg-muted overflow-hidden shrink-0 border-2 border-primary/10 group-hover:border-primary shadow-lg ring-4 ring-primary/5">
-                      <Image
-                        src={
-                          res.photoReferences?.[0]
-                            ? `/api/places/photo?reference=${encodeURIComponent(res.photoReferences[0])}`
-                            : FALLBACK_IMAGE
-                        }
-                        alt={res.name}
-                        width={96}
-                        height={96}
-                        unoptimized={!!res.photoReferences?.[0]}
-                        className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700"
-                      />
-                    </div>
+                  <div
+                    className={cn(
+                      "grid min-w-0 items-start",
+                      showPhotos ? "grid-cols-[6rem_1fr] gap-5" : "grid-cols-1",
+                    )}
+                  >
+                    {showPhotos && (
+                      <div className="h-24 w-24 rounded-3xl bg-muted overflow-hidden shrink-0 border-2 border-primary/10 group-hover:border-primary shadow-lg ring-4 ring-primary/5">
+                        <Image
+                          src={
+                            res.photoReferences?.[0]
+                              ? `/api/places/photo?reference=${encodeURIComponent(res.photoReferences[0])}`
+                              : FALLBACK_IMAGE
+                          }
+                          alt={res.name}
+                          width={96}
+                          height={96}
+                          unoptimized={!!res.photoReferences?.[0]}
+                          className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700"
+                        />
+                      </div>
+                    )}
 
                     <div className="min-w-0 flex flex-col gap-1.5 overflow-hidden">
                       <div className="flex min-w-0 items-start justify-between gap-2">
