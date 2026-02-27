@@ -29,7 +29,31 @@ export function ShareLinkButton({
       if (!url || typeof url !== "string") {
         throw new Error("Share link missing");
       }
-      await navigator.clipboard.writeText(url);
+
+      if (typeof navigator.share === "function") {
+        try {
+          await navigator.share({ url });
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1600);
+          return;
+        } catch (shareErr) {
+          if (shareErr instanceof Error && shareErr.name === "AbortError") return;
+        }
+      }
+
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch {
+        const textArea = document.createElement("textarea");
+        textArea.value = url;
+        textArea.style.position = "fixed";
+        textArea.style.opacity = "0";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch (e) {
