@@ -2,7 +2,7 @@ import type { Visit as PrismaVisit, Photo } from '@prisma/client';
 
 export type Visit = PrismaVisit;
 
-export type VisitWithPhotos = Visit & { photos?: Pick<Photo, 'url'>[] };
+export type VisitWithPhotos = Visit & { photos?: Pick<Photo, 'id' | 'url'>[] };
 
 export interface VisitFormData {
   restaurantId: string;

@@ -88,7 +88,7 @@ export async function GET(
     where: { groupId: id },
     orderBy: { visitDate: "desc" },
     include: {
-      photos: { select: { url: true } },
+      photos: { select: { id: true, url: true } },
       restaurant: { select: { id: true, name: true } },
     },
   });

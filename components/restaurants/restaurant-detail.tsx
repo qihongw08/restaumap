@@ -204,7 +204,11 @@ export function RestaurantDetail({ restaurant }: RestaurantDetailProps) {
           <h2 className="text-xl font-black italic tracking-tighter text-foreground">
             Your Food Journey
           </h2>
-          <PFRatioDisplay visits={restaurant.visits} />
+          <PFRatioDisplay
+            visits={restaurant.visits}
+            restaurantId={restaurant.id}
+            editable
+          />
           <Button
             type="button"
             onClick={() => setLogVisitOpen(true)}
