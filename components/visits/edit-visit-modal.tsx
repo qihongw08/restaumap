@@ -42,9 +42,7 @@ export function EditVisitModal({
     Number(visit.fullnessScore),
   );
   const [tasteScore, setTasteScore] = useState(Number(visit.tasteScore));
-  const [pricePaid, setPricePaid] = useState(
-    String(Number(visit.pricePaid)),
-  );
+  const [pricePaid, setPricePaid] = useState(String(Number(visit.pricePaid)));
   const [notes, setNotes] = useState(visit.notes ?? "");
 
   const [existingPhotos, setExistingPhotos] = useState(visit.photos ?? []);

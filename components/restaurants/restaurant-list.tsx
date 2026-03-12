@@ -5,19 +5,23 @@ import { RestaurantCard } from "@/components/restaurants/restaurant-card";
 import { RemoveRestaurantModal } from "@/components/restaurants/remove-restaurant-modal";
 import { Loading } from "@/components/shared/loading";
 import { useRestaurants } from "@/hooks/use-restaurants";
+import type { RestaurantWithVisits } from "@/types/restaurant";
 
 interface RestaurantListProps {
   status?: string;
   excludeBlacklisted?: boolean;
+  initialRestaurants?: RestaurantWithVisits[];
 }
 
 export function RestaurantList({
   status,
   excludeBlacklisted = true,
+  initialRestaurants,
 }: RestaurantListProps) {
   const { restaurants, isLoading, error, refetch } = useRestaurants({
     status,
     excludeBlacklisted,
+    initialData: initialRestaurants,
   });
   const [removeTarget, setRemoveTarget] = useState<{
     id: string;
@@ -69,11 +73,12 @@ export function RestaurantList({
   return (
     <>
       <ul className="space-y-3">
-        {restaurants.map((restaurant) => (
+        {restaurants.map((restaurant, index) => (
           <li key={restaurant.id}>
             <RestaurantCard
               restaurant={restaurant}
               onRemove={handleRemoveClick}
+              priority={index < 2}
             />
           </li>
         ))}

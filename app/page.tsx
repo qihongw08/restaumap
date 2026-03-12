@@ -6,12 +6,51 @@ import { DashboardHeader } from "@/components/home/dashboard-header";
 import { getCurrentUser } from "@/lib/auth";
 import { getDbUser } from "@/lib/sync-user";
 import { ImportButtons } from "@/components/home/import-buttons";
+import { prisma } from "@/lib/prisma";
 
 export default async function Home() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const dbUser = await getDbUser(user.id);
+  const [dbUser, userRestaurants] = await Promise.all([
+    getDbUser(user.id),
+    prisma.userRestaurant.findMany({
+      where: { userId: user.id, isBlacklisted: false },
+      orderBy: { savedAt: "desc" },
+      include: {
+        restaurant: {
+          include: {
+            visits: {
+              where: { userId: user.id },
+              orderBy: { visitDate: "desc" },
+              take: 5,
+              include: { photos: true },
+            },
+          },
+        },
+      },
+    }),
+  ]);
+
+  // Serialize Date objects before passing to the Client Component (rsc-boundaries rule)
+  const initialRestaurants = userRestaurants.map((ur) => ({
+    ...ur.restaurant,
+    createdAt: ur.restaurant.createdAt.toISOString(),
+    updatedAt: ur.restaurant.updatedAt.toISOString(),
+    status: ur.status,
+    isBlacklisted: ur.isBlacklisted,
+    sourceUrl: ur.sourceUrl,
+    visits: ur.restaurant.visits.map((v) => ({
+      ...v,
+      visitDate: v.visitDate.toISOString(),
+      createdAt: v.createdAt.toISOString(),
+      updatedAt: v.updatedAt.toISOString(),
+      photos: v.photos.map((p) => ({
+        ...p,
+        uploadedAt: p.uploadedAt.toISOString(),
+      })),
+    })),
+  }));
 
   return (
     <div className="min-h-screen bg-background pb-32">
@@ -35,7 +74,7 @@ export default async function Home() {
               View all
             </Link>
           </div>
-          <RestaurantList />
+          <RestaurantList initialRestaurants={initialRestaurants} />
         </section>
       </main>
       <Nav />

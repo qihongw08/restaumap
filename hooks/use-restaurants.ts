@@ -1,14 +1,16 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import type { RestaurantWithVisits } from '@/types/restaurant';
 
 export function useRestaurants(options?: {
   status?: string;
   excludeBlacklisted?: boolean;
+  initialData?: RestaurantWithVisits[];
 }) {
-  const [restaurants, setRestaurants] = useState<RestaurantWithVisits[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const hasInitialData = useRef(options?.initialData !== undefined);
+  const [restaurants, setRestaurants] = useState<RestaurantWithVisits[]>(options?.initialData ?? []);
+  const [isLoading, setIsLoading] = useState(!hasInitialData.current);
   const [error, setError] = useState<string | null>(null);
 
   const fetchRestaurants = useCallback(async () => {
@@ -31,7 +33,9 @@ export function useRestaurants(options?: {
   }, [options?.status, options?.excludeBlacklisted]);
 
   useEffect(() => {
-    fetchRestaurants();
+    if (!hasInitialData.current) {
+      fetchRestaurants();
+    }
   }, [fetchRestaurants]);
 
   return { restaurants, isLoading, error, refetch: fetchRestaurants };

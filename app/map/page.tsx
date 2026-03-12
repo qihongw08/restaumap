@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { Nav } from "@/components/shared/nav";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { MapView } from "@/components/map/map-view";
 import type { RestaurantStatus } from "@prisma/client";
+import type { RestaurantWithDetails } from "@/types/restaurant";
 
 export default async function MapPage({
   searchParams,
@@ -72,23 +74,37 @@ export default async function MapPage({
 
   let list = userRestaurants.map((ur) => ({
     ...ur.restaurant,
+    createdAt: ur.restaurant.createdAt.toISOString(),
+    updatedAt: ur.restaurant.updatedAt.toISOString(),
     status: ur.status,
     isBlacklisted: ur.isBlacklisted,
+    visits: ur.restaurant.visits.map((v) => ({
+      ...v,
+      visitDate: v.visitDate.toISOString(),
+      createdAt: v.createdAt.toISOString(),
+      updatedAt: v.updatedAt.toISOString(),
+    })),
+    photos: ur.restaurant.photos.map((p) => ({
+      ...p,
+      uploadedAt: p.uploadedAt.toISOString(),
+    })),
   }));
   if (params.priceRange) {
     list = list.filter((r) => r.priceRange === params.priceRange);
   }
-  const restaurants = list;
+  const restaurants = list as unknown as RestaurantWithDetails[];
 
   return (
     <div className="fixed inset-0 min-h-screen bg-background overflow-hidden">
       <main className="relative h-full w-full">
-        <MapView
-          restaurants={restaurants}
-          highlightRestaurantId={params.restaurant ?? null}
-          selectedGroupId={groupId}
-          groupOptions={groupOptions}
-        />
+        <Suspense>
+          <MapView
+            restaurants={restaurants}
+            highlightRestaurantId={params.restaurant ?? null}
+            selectedGroupId={groupId}
+            groupOptions={groupOptions}
+          />
+        </Suspense>
       </main>
       <Nav />
     </div>

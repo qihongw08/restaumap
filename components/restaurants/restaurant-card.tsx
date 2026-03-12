@@ -16,9 +16,10 @@ const FALLBACK_IMAGE =
 interface RestaurantCardProps {
   restaurant: RestaurantWithVisits;
   onRemove?: (id: string, name: string) => void;
+  priority?: boolean;
 }
 
-export function RestaurantCard({ restaurant, onRemove }: RestaurantCardProps) {
+export function RestaurantCard({ restaurant, onRemove, priority }: RestaurantCardProps) {
   const latestVisit = restaurant.visits[0];
   const statusLabel =
     RESTAURANT_STATUS_LABELS[restaurant.status] ?? restaurant.status;
@@ -52,25 +53,22 @@ export function RestaurantCard({ restaurant, onRemove }: RestaurantCardProps) {
     setCurrentIndex((i) => (i + delta + slides.length) % slides.length);
   };
 
+  const currentSrc = slides[currentIndex];
+
   return (
     <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-[0_12px_40px_rgba(0,0,0,0.1)] hover:-translate-y-1 bg-card border-border border-2 rounded-[2.5rem]">
       <Link href={`/restaurants/${restaurant.id}`} className="block">
         <div className="relative aspect-[16/10] w-full overflow-hidden">
-          {slides.map((src, i) => (
-            <Image
-              key={src}
-              src={src}
-              alt={restaurant.name}
-              width={400}
-              height={250}
-              unoptimized={src.startsWith("/api/places/photo")}
-              className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
-              style={{
-                transform: `translateX(${(i - currentIndex) * 100}%)`,
-                zIndex: i === currentIndex ? 1 : 0,
-              }}
-            />
-          ))}
+          <Image
+            key={currentSrc}
+            src={currentSrc}
+            alt={restaurant.name}
+            fill
+            sizes="(max-width: 640px) 100vw, 512px"
+            unoptimized={currentSrc.startsWith("/api/places/photo")}
+            priority={priority}
+            className="object-cover transition-transform duration-500 ease-out group-hover:scale-105 animate-fade-in"
+          />
           {slides.length > 1 && (
             <>
               <button
