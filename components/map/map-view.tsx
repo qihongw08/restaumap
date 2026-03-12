@@ -186,7 +186,6 @@ export function MapView({
     }, {});
   }, [visitLogMarkers]);
 
-  // For backward compat with share pages that pass full restaurants
   const handleRestaurantClick = useCallback(
     (id: string) => {
       if (selectedRestaurantId === id) {
@@ -206,90 +205,93 @@ export function MapView({
 
   return (
     <>
-      {/* Group selector + Spots/Logs toggle — unified control */}
-      <div className="pointer-events-none absolute left-1/2 top-28 z-[60] w-[calc(100%-2rem)] max-w-[260px] -translate-x-1/2">
-        <div className="pointer-events-auto relative space-y-2 rounded-xl border border-primary/20 bg-background/95 px-3 py-2 shadow-lg backdrop-blur">
-          {groupOptions.length > 0 && (
-            <div className="flex items-center gap-2">
-              <p className="shrink-0 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                Group
-              </p>
-              <div className="min-w-0 flex-1">
-                <button
-                  type="button"
-                  onClick={() => setGroupMenuOpen((o) => !o)}
-                  className="flex w-full min-w-0 items-center justify-between gap-2 rounded-md bg-background px-2 py-1 text-xs font-semibold text-foreground"
-                  aria-label="Choose group for map"
-                  aria-expanded={groupMenuOpen}
-                >
-                  <span className="min-w-0 flex-1 overflow-hidden text-left">
-                    <span className="line-clamp-1 block">
-                      {selectedGroupName}
+      {!shareToken && (
+        <div className="pointer-events-none absolute left-1/2 top-28 z-[60] w-[calc(100%-2rem)] max-w-[260px] -translate-x-1/2">
+          <div className="pointer-events-auto relative space-y-2 rounded-xl border border-primary/20 bg-background/95 px-3 py-2 shadow-lg backdrop-blur">
+            {groupOptions.length > 0 && (
+              <div className="flex items-center gap-2">
+                <p className="shrink-0 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  Group
+                </p>
+                <div className="min-w-0 flex-1">
+                  <button
+                    type="button"
+                    onClick={() => setGroupMenuOpen((o) => !o)}
+                    className="flex w-full min-w-0 items-center justify-between gap-2 rounded-md bg-background px-2 py-1 text-xs font-semibold text-foreground"
+                    aria-label="Choose group for map"
+                    aria-expanded={groupMenuOpen}
+                  >
+                    <span className="min-w-0 flex-1 overflow-hidden text-left">
+                      <span className="line-clamp-1 block">
+                        {selectedGroupName}
+                      </span>
                     </span>
-                  </span>
-                  <span className="shrink-0 text-[10px] text-muted-foreground">
-                    {groupMenuOpen ? "▲" : "▼"}
-                  </span>
-                </button>
-                {groupMenuOpen && (
-                  <div className="absolute left-3 right-3 top-[calc(100%+6px)] max-h-48 overflow-y-auto rounded-lg bg-background p-1 shadow-xl">
-                    <button
-                      type="button"
-                      onClick={() => handleGroupChange("")}
-                      className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-foreground hover:bg-muted/60"
-                    >
-                      <span className="line-clamp-1 block">All</span>
-                    </button>
-                    {groupOptions.map((group) => (
+                    <span className="shrink-0 text-[10px] text-muted-foreground">
+                      {groupMenuOpen ? "▲" : "▼"}
+                    </span>
+                  </button>
+                  {groupMenuOpen && (
+                    <div className="absolute left-3 right-3 top-[calc(100%+6px)] max-h-48 overflow-y-auto rounded-lg bg-background p-1 shadow-xl">
                       <button
-                        key={group.id}
                         type="button"
-                        onClick={() => handleGroupChange(group.id)}
+                        onClick={() => handleGroupChange("")}
                         className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-foreground hover:bg-muted/60"
                       >
-                        <span className="line-clamp-1 block">{group.name}</span>
+                        <span className="line-clamp-1 block">All</span>
                       </button>
-                    ))}
-                  </div>
-                )}
+                      {groupOptions.map((group) => (
+                        <button
+                          key={group.id}
+                          type="button"
+                          onClick={() => handleGroupChange(group.id)}
+                          className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-foreground hover:bg-muted/60"
+                        >
+                          <span className="line-clamp-1 block">
+                            {group.name}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {visitLogMarkers.length > 0 && (
-            <div className="flex rounded-full bg-muted/50 p-0.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setMapMode("spots");
-                  setSelectedLogRestaurantId(null);
-                }}
-                className={`flex-1 rounded-full py-1.5 text-[10px] font-black uppercase tracking-widest transition-all ${
-                  mapMode === "spots"
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Spots
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMapMode("logs");
-                  setSelectedRestaurantId(null);
-                }}
-                className={`flex-1 rounded-full py-1.5 text-[10px] font-black uppercase tracking-widest transition-all ${
-                  mapMode === "logs"
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Logs
-              </button>
-            </div>
-          )}
+            {visitLogMarkers.length > 0 && (
+              <div className="flex rounded-full bg-muted/50 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMapMode("spots");
+                    setSelectedLogRestaurantId(null);
+                  }}
+                  className={`flex-1 rounded-full py-1.5 text-[10px] font-black uppercase tracking-widest transition-all ${
+                    mapMode === "spots"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Spots
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMapMode("logs");
+                    setSelectedRestaurantId(null);
+                  }}
+                  className={`flex-1 rounded-full py-1.5 text-[10px] font-black uppercase tracking-widest transition-all ${
+                    mapMode === "logs"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Logs
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       <RestaurantMap
         markers={mapMode === "spots" ? markers : []}

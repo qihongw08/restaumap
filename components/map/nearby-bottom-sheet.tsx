@@ -9,6 +9,7 @@ import {
   Clock,
   DollarSign,
   UtensilsCrossed,
+  ExternalLink,
 } from "lucide-react";
 import type { RestaurantWithDetails } from "@/types/restaurant";
 import { useLocation } from "@/hooks/use-location";
@@ -343,11 +344,18 @@ export function NearbyBottomSheet({
                 }}
                 className="min-w-0"
               >
-                <button
-                  type="button"
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => onRestaurantClick?.(res.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onRestaurantClick?.(res.id);
+                    }
+                  }}
                   className={cn(
-                    "group relative flex w-full min-w-0 flex-col gap-4 p-5 rounded-[2.5rem] bg-background/40 border transition-all active:scale-[0.98] shadow-sm text-left overflow-hidden",
+                    "group relative flex w-full min-w-0 flex-col gap-4 p-5 rounded-[2.5rem] bg-background/40 border transition-all active:scale-[0.98] shadow-sm text-left overflow-hidden cursor-pointer",
                     highlightedRestaurantId === res.id
                       ? "border-primary ring-2 ring-primary/50 bg-primary/5"
                       : "border-primary/5 hover:border-primary/40 hover:bg-muted/80",
@@ -408,6 +416,30 @@ export function NearbyBottomSheet({
                           </span>
                         </div>
                       )}
+                      {res.sourceUrl && (
+                        <div className="flex min-w-0 items-center gap-2 overflow-hidden text-muted-foreground mt-1">
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 truncate text-[10px] font-bold uppercase tracking-widest text-primary hover:underline"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              window.open(res.sourceUrl!, "_blank", "noopener,noreferrer");
+                            }}
+                          >
+                            <ExternalLink className="h-3 w-3 shrink-0" />
+                            <span className="line-clamp-1">
+                              {(() => {
+                                try {
+                                  return new URL(res.sourceUrl!).hostname.replace(/^www\./, "");
+                                } catch {
+                                  return "Source";
+                                }
+                              })()}
+                            </span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -423,7 +455,7 @@ export function NearbyBottomSheet({
                       ))}
                     </div>
                   )}
-                </button>
+                </div>
               </div>
             ))}
 
