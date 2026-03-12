@@ -25,11 +25,11 @@ export function LocationButton() {
       type="button"
       onClick={goToMyLocation}
       disabled={isLoading}
-      className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-primary/25 bg-blue-500 shadow-xl transition hover:bg-blue-600 disabled:opacity-60"
+      className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-primary/25 bg-blue-500 shadow-xl transition hover:bg-blue-600 disabled:opacity-60"
       title={error ?? 'Center on my location'}
       aria-label="Center on my location"
     >
-      <MapPin className="h-5 w-5 text-white" />
+      <MapPin className="h-4 w-4 text-white" />
     </button>
   );
 }

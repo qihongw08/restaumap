@@ -25,7 +25,8 @@ export async function PATCH(
     const data: Record<string, unknown> = {};
 
     if (body.visitDate !== undefined) {
-      data.visitDate = new Date(body.visitDate);
+      const dateStr = String(body.visitDate);
+      data.visitDate = new Date(dateStr.includes("T") ? dateStr : `${dateStr}T12:00:00`);
     }
     if (body.fullnessScore !== undefined) {
       if (!isValidFullnessOrTaste(body.fullnessScore)) {

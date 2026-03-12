@@ -3,18 +3,12 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import {
-  Pizza,
   Search,
   ChevronUp,
   ChevronDown,
   Clock,
   DollarSign,
   UtensilsCrossed,
-  Soup,
-  Beef,
-  Flame,
-  Coffee,
-  IceCream,
 } from "lucide-react";
 import type { RestaurantWithDetails } from "@/types/restaurant";
 import { useLocation } from "@/hooks/use-location";
@@ -28,18 +22,14 @@ interface NearbyBottomSheetProps {
   /** First click: select and zoom to restaurant. Second click (same card): navigate to restaurant page. */
   onRestaurantClick?: (restaurantId: string) => void;
   showPhotos?: boolean;
+  /** Controlled filter state — when provided, filters are driven externally */
+  controlledCategory?: string;
+  onCategoryChange?: (category: string) => void;
+  controlledPriceRange?: string | null;
+  onPriceRangeChange?: (priceRange: string | null) => void;
+  /** Dynamic cuisine list from API — when provided, replaces hardcoded categories */
+  cuisines?: string[];
 }
-
-const CATEGORIES = [
-  { name: "All", icon: UtensilsCrossed },
-  { name: "Pizza", icon: Pizza },
-  { name: "Chinese", icon: Soup },
-  { name: "Steak", icon: Beef },
-  { name: "Thai", icon: Flame },
-  { name: "Burgers", icon: UtensilsCrossed },
-  { name: "Cafe", icon: Coffee },
-  { name: "Dessert", icon: IceCream },
-];
 
 const PRICE_RANGES = ["$", "$$", "$$$", "$$$$"] as const;
 const FALLBACK_IMAGE =
@@ -97,6 +87,11 @@ export function NearbyBottomSheet({
   onOpenChange,
   onRestaurantClick,
   showPhotos = true,
+  controlledCategory,
+  onCategoryChange,
+  controlledPriceRange,
+  onPriceRangeChange,
+  cuisines,
 }: NearbyBottomSheetProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled =
@@ -104,8 +99,19 @@ export function NearbyBottomSheet({
   const isOpen = isControlled ? controlledOpen : internalOpen;
   const setIsOpen = isControlled ? onOpenChange : setInternalOpen;
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const [activeCategory, setActiveCategory] = useState("All");
-  const [priceRangeFilter, setPriceRangeFilter] = useState<string | null>(null);
+
+  // Filters: controlled (from SWRBottomSheet) or internal (share pages)
+  const [internalCategory, setInternalCategory] = useState("All");
+  const activeCategory = controlledCategory ?? internalCategory;
+  const setActiveCategory = onCategoryChange ?? setInternalCategory;
+  const [internalPriceRange, setInternalPriceRange] = useState<string | null>(
+    null,
+  );
+  const priceRangeFilter =
+    controlledPriceRange !== undefined
+      ? controlledPriceRange
+      : internalPriceRange;
+  const setPriceRangeFilter = onPriceRangeChange ?? setInternalPriceRange;
   const [onlyOpen, setOnlyOpen] = useState(false);
   const [openStatusByPlaceId, setOpenStatusByPlaceId] = useState<
     Record<string, boolean>
@@ -158,9 +164,13 @@ export function NearbyBottomSheet({
       return { ...res, distance };
     });
 
-    withDetails.sort(
-      (a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity),
-    );
+    // Sort by distance, but push VISITED to the end
+    withDetails.sort((a, b) => {
+      const aVisited = a.status === "VISITED" ? 1 : 0;
+      const bVisited = b.status === "VISITED" ? 1 : 0;
+      if (aVisited !== bVisited) return aVisited - bVisited;
+      return (a.distance ?? Infinity) - (b.distance ?? Infinity);
+    });
 
     return withDetails;
   }, [restaurants, activeCategory, priceRangeFilter, coords]);
@@ -230,32 +240,31 @@ export function NearbyBottomSheet({
           </div>
         </div>
 
-        <div className="px-6 pb-6">
-          <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide snap-x">
-            {CATEGORIES.map((cat) => (
+        <div className="px-6 pb-4">
+          <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x">
+            <button
+              onClick={() => setActiveCategory("All")}
+              className={cn(
+                "shrink-0 snap-start rounded-full border px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all",
+                activeCategory === "All"
+                  ? "bg-primary border-primary text-primary-foreground shadow-sm"
+                  : "bg-background border-border text-muted-foreground hover:border-primary/30",
+              )}
+            >
+              All
+            </button>
+            {(cuisines ?? []).map((name) => (
               <button
-                key={cat.name}
-                onClick={() => setActiveCategory(cat.name)}
+                key={name}
+                onClick={() => setActiveCategory(name)}
                 className={cn(
-                  "flex flex-col items-center gap-3 min-w-[4.5rem] transition-all snap-start",
-                  activeCategory === cat.name
-                    ? "opacity-100 scale-105"
-                    : "opacity-30 hover:opacity-100",
+                  "shrink-0 snap-start rounded-full border px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all",
+                  activeCategory === name
+                    ? "bg-primary border-primary text-primary-foreground shadow-sm"
+                    : "bg-background border-border text-muted-foreground hover:border-primary/30",
                 )}
               >
-                <div
-                  className={cn(
-                    "h-16 w-16 rounded-[1.5rem] flex items-center justify-center border-2 transition-all shadow-xl",
-                    activeCategory === cat.name
-                      ? "bg-primary border-primary text-primary-foreground shadow-primary/40 rotate-3"
-                      : "bg-background border-border text-foreground -rotate-2",
-                  )}
-                >
-                  <cat.icon className="h-7 w-7" />
-                </div>
-                <span className="text-[10px] font-black uppercase tracking-[0.2em]">
-                  {cat.name}
-                </span>
+                {name}
               </button>
             ))}
           </div>
@@ -353,9 +362,7 @@ export function NearbyBottomSheet({
                     <div className="min-w-0 flex flex-col gap-1.5 overflow-hidden">
                       <div className="flex min-w-0 items-start justify-between gap-2">
                         <h4 className="min-w-0 flex-1 text-md font-black italic tracking-tighter text-foreground uppercase group-hover:text-primary transition-colors overflow-hidden">
-                          <span className="line-clamp-1 block">
-                            {res.name}
-                          </span>
+                          <span className="line-clamp-1 block">{res.name}</span>
                         </h4>
                         {res.distance != null && (
                           <div className="flex shrink-0 items-center gap-1 overflow-hidden bg-primary/10 px-3 py-1 rounded-full border border-primary/20 max-w-[40%]">
@@ -365,6 +372,25 @@ export function NearbyBottomSheet({
                           </div>
                         )}
                       </div>
+                      {res.status && res.status !== "WANT_TO_GO" && (
+                        <span
+                          className={cn(
+                            "self-start rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-widest",
+                            res.status === "VISITED" &&
+                              "bg-emerald-500/15 text-emerald-600",
+                            res.status === "FAVORITE" &&
+                              "bg-primary/15 text-primary",
+                            res.status === "WARNING_ZONE" &&
+                              "bg-destructive/15 text-destructive",
+                          )}
+                        >
+                          {res.status === "VISITED"
+                            ? "Visited"
+                            : res.status === "FAVORITE"
+                              ? "Favorite"
+                              : "Warning"}
+                        </span>
+                      )}
                       {(res.formattedAddress ?? res.address) && (
                         <p className="line-clamp-1 text-[10px] text-muted-foreground overflow-hidden">
                           {res.formattedAddress ?? res.address}

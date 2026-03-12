@@ -35,6 +35,15 @@ export type RestaurantWithDetails = Restaurant & {
   isBlacklisted?: boolean;
 };
 
+/** Lightweight marker data for map rendering — no photos, visits, or heavy fields */
+export interface MarkerData {
+  id: string;
+  name: string;
+  latitude: number | null;
+  longitude: number | null;
+  status: RestaurantStatus;
+}
+
 export interface RestaurantFormData {
   name: string;
   address?: string;

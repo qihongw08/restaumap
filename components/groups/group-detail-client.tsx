@@ -13,17 +13,14 @@ import {
   Plus,
   Link2,
   Copy,
+  Check,
   Trash2,
   Loader2,
   ExternalLink,
   UtensilsCrossed,
   Sparkles,
-  Calendar,
-  ImageIcon,
   Map,
 } from "lucide-react";
-import { format } from "date-fns";
-import { calculatePFRatio, formatPFRatio } from "@/lib/utils";
 
 type MemberUser = {
   username: string | null;
@@ -49,25 +46,11 @@ type GroupRestaurant = {
   restaurant: Restaurant;
   sourceUrl?: string | null;
 };
-type GroupVisit = {
-  id: string;
-  userId: string;
-  restaurantId: string;
-  visitDate: string;
-  fullnessScore: number;
-  tasteScore: number;
-  pricePaid: number;
-  notes: string | null;
-  photos: { url: string }[];
-  restaurant: { id: string; name: string };
-  user: { username: string | null; avatarUrl?: string } | null;
-};
 export type GroupDetailData = {
   id: string;
   name: string;
   members: GroupMember[];
   groupRestaurants: GroupRestaurant[];
-  groupVisits: GroupVisit[];
   currentUserId: string;
   currentMember: { role: string } | null;
 };
@@ -79,7 +62,6 @@ export function GroupDetailClient({ group }: { group: GroupDetailData }) {
   const [addRestaurantOpen, setAddRestaurantOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
-  const [activeTab, setActiveTab] = useState<"restaurants" | "memory-lane">("restaurants");
   const [error, setError] = useState<string | null>(null);
 
   const isOwner = group.currentMember?.role === "owner";
@@ -121,40 +103,39 @@ export function GroupDetailClient({ group }: { group: GroupDetailData }) {
 
   return (
     <main className="mx-auto max-w-lg px-6">
-      <Link
-        href="/groups"
+      <button
+        type="button"
+        onClick={() => router.back()}
         className="mb-6 inline-flex items-center gap-1 text-sm font-bold text-muted-foreground hover:text-foreground"
       >
         <ChevronRight className="h-4 w-4 rotate-180" /> Back to groups
-      </Link>
+      </button>
 
       {error && (
         <p className="mb-4 text-sm font-bold text-destructive">{error}</p>
       )}
 
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-black italic tracking-tighter text-foreground uppercase">
-            {group.name}
-          </h1>
-          <p className="mt-1 flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            <Users className="h-3.5 w-3.5" />
-            {group.members.length} member{group.members.length !== 1 ? "s" : ""} ·{" "}
-            {group.groupRestaurants.length} restaurant
-            {group.groupRestaurants.length !== 1 ? "s" : ""}
-          </p>
-        </div>
+      <div className="mb-6 rounded-2xl border-2 border-primary/30 bg-gradient-to-r from-primary/20 to-primary/5 p-5">
+        <h1 className="text-3xl font-black italic tracking-tighter text-foreground uppercase">
+          {group.name}
+        </h1>
+        <p className="mt-1 flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+          <Users className="h-3.5 w-3.5" />
+          {group.members.length} member{group.members.length !== 1 ? "s" : ""} ·{" "}
+          {group.groupRestaurants.length} restaurant
+          {group.groupRestaurants.length !== 1 ? "s" : ""}
+        </p>
         {isOwner && (
-          <div className="flex flex-col gap-2">
+          <div className="mt-4">
             {inviteUrl ? (
-              <div className="flex items-center gap-2 rounded-xl border-2 border-border bg-muted/30 px-3 py-2">
+              <div className={`flex items-center gap-2 rounded-xl border-2 px-3 py-2 transition-all ${copySuccess ? "border-primary bg-primary/10 ring-2 ring-primary/30" : "border-border bg-background/60"}`}>
                 <input
                   readOnly
                   value={inviteUrl}
                   className="min-w-0 flex-1 bg-transparent text-xs text-foreground outline-none"
                 />
-                <Button size="sm" variant="secondary" onClick={handleCopyInvite} className="shrink-0">
-                  {copySuccess ? "Copied!" : <Copy className="h-4 w-4" />}
+                <Button size="sm" variant={copySuccess ? "primary" : "secondary"} onClick={handleCopyInvite} className="shrink-0">
+                  {copySuccess ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                 </Button>
               </div>
             ) : (
@@ -188,52 +169,41 @@ export function GroupDetailClient({ group }: { group: GroupDetailData }) {
       <button
         type="button"
         onClick={() => setMembersOpen(true)}
-        className="mb-6 flex w-full items-center justify-between rounded-xl border-2 border-border bg-muted/20 px-4 py-3 md:hidden hover:border-primary/40 hover:bg-muted/30 transition-colors"
+        className="mb-6 flex w-full items-center gap-3 rounded-xl border border-black/10 bg-white px-4 py-3 shadow-sm md:hidden hover:border-primary/30 transition-colors"
         aria-label="Show members"
       >
-        <span className="text-sm font-black uppercase tracking-widest text-muted-foreground">
-          Members
+        <div className="flex">
+          {group.members.slice(0, 4).map((m, i) =>
+            m.user?.avatarUrl ? (
+              <Image
+                key={m.id}
+                src={m.user.avatarUrl}
+                alt={m.user?.username ?? ""}
+                width={28}
+                height={28}
+                className={`h-7 w-7 rounded-full object-cover ring-2 ring-background${i > 0 ? " -ml-2" : ""}`}
+              />
+            ) : (
+              <div
+                key={m.id}
+                className={`flex h-7 w-7 items-center justify-center rounded-full bg-muted ring-2 ring-background text-[10px] font-black text-muted-foreground${i > 0 ? " -ml-2" : ""}`}
+              >
+                {(m.user?.username ?? "?")[0].toUpperCase()}
+              </div>
+            )
+          )}
+        </div>
+        <span className="flex-1 text-left text-sm font-black uppercase tracking-widest text-muted-foreground">
+          {group.members.length} Member{group.members.length !== 1 ? "s" : ""}
         </span>
-        <span className="text-xs font-bold text-muted-foreground">
-          {group.members.length} · Tap to view
-        </span>
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
       </button>
 
       <Modal open={membersOpen} onClose={() => setMembersOpen(false)} title="Members">
         <MembersList members={group.members} currentUserId={group.currentUserId} />
       </Modal>
 
-      {/* Tabs */}
-      <div className="mb-4 flex rounded-xl bg-muted/40 p-1">
-        <button
-          type="button"
-          onClick={() => setActiveTab("restaurants")}
-          className={`flex-1 rounded-lg py-2.5 text-sm font-black uppercase tracking-widest transition-colors ${
-            activeTab === "restaurants"
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Restaurants
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("memory-lane")}
-          className={`flex-1 rounded-lg py-2.5 text-sm font-black uppercase tracking-widest transition-colors ${
-            activeTab === "memory-lane"
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Memory lane
-        </button>
-      </div>
-
-      {activeTab === "memory-lane" ? (
-        <MemoryLaneSection visits={group.groupVisits} currentUserId={group.currentUserId} />
-      ) : (
-        <>
-          <div className="mb-6 space-y-3">
+      <div className="mb-6 space-y-3">
             <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground">
               Restaurants
             </h2>
@@ -241,11 +211,11 @@ export function GroupDetailClient({ group }: { group: GroupDetailData }) {
               <ShareLinkButton
                 endpoint={`/api/share/group/${group.id}`}
                 label="Share"
-                className="w-full justify-center rounded-xl border border-border bg-background px-3 py-2 text-xs shadow-none"
+                className="w-full justify-center rounded-xl border border-black/15 bg-white px-3 py-2 text-xs shadow-sm"
               />
               <Link
                 href={`/map?groupId=${group.id}`}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-xs font-black uppercase tracking-widest text-foreground"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-black/15 bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-foreground shadow-sm"
               >
                 <Map className="h-3.5 w-3.5" />
                 Open map
@@ -285,7 +255,7 @@ export function GroupDetailClient({ group }: { group: GroupDetailData }) {
                 const hasMeta = cuisines || r.priceRange || ambience;
                 return (
                   <li key={gr.id}>
-                    <div className="flex items-start gap-3 rounded-2xl border-2 border-border bg-background p-4 shadow-sm">
+                    <div className="flex items-start gap-3 rounded-2xl border border-black/10 bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
                       <Link href={`/restaurants/${r.id}`} className="min-w-0 flex-1">
                         <p className="font-bold text-foreground truncate">{r.name}</p>
                         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
@@ -362,8 +332,6 @@ export function GroupDetailClient({ group }: { group: GroupDetailData }) {
               })}
             </ul>
           )}
-        </>
-      )}
 
       <AddRestaurantModal
         open={addRestaurantOpen}
@@ -373,107 +341,6 @@ export function GroupDetailClient({ group }: { group: GroupDetailData }) {
         onAdded={() => router.refresh()}
       />
     </main>
-  );
-}
-
-function MemoryLaneSection({
-  visits,
-  currentUserId,
-}: {
-  visits: GroupVisit[];
-  currentUserId: string;
-}) {
-  if (visits.length === 0) {
-    return (
-      <div className="rounded-2xl border-2 border-dashed border-muted bg-muted/20 p-8 text-center">
-        <p className="text-sm font-bold text-muted-foreground">No group visits yet</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          When someone logs a visit and tags this group, it will show here.
-        </p>
-      </div>
-    );
-  }
-  return (
-    <ul className="space-y-4">
-      {visits.map((v) => {
-        const pfRatio = calculatePFRatio(Number(v.fullnessScore), Number(v.tasteScore), Number(v.pricePaid));
-        const displayName = v.userId === currentUserId ? "You" : (v.user?.username ?? "Someone");
-        const photos = v.photos ?? [];
-        return (
-          <li key={v.id} className="rounded-xl border-2 border-border bg-card overflow-hidden">
-            <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 border-b border-border">
-              {v.user?.avatarUrl ? (
-                <Image
-                  src={v.user.avatarUrl}
-                  alt=""
-                  width={32}
-                  height={32}
-                  className="size-8 shrink-0 rounded-full object-cover"
-                />
-              ) : (
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                  <Users className="h-4 w-4" />
-                </div>
-              )}
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold text-foreground truncate">{displayName}</p>
-                <Link
-                  href={`/restaurants/${v.restaurant.id}`}
-                  className="text-xs font-medium text-primary hover:underline truncate block"
-                >
-                  {v.restaurant.name}
-                </Link>
-              </div>
-              <div className="text-right shrink-0">
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Calendar className="h-3.5 w-3.5" />
-                  {format(new Date(v.visitDate), "MMM d, yyyy")}
-                </div>
-                <p className="text-sm font-black italic text-primary">PF {formatPFRatio(pfRatio)}</p>
-              </div>
-            </div>
-            {photos.length > 0 ? (
-              <div className="flex gap-2 p-3 flex-wrap">
-                {photos.map((photo) => (
-                  <a
-                    key={photo.url}
-                    href={photo.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block rounded-lg overflow-hidden border border-border bg-muted shrink-0 focus:ring-2 focus:ring-primary/30 focus:outline-none"
-                  >
-                    {process.env.NEXT_PUBLIC_R2_PUBLIC_URL &&
-                    photo.url.startsWith(process.env.NEXT_PUBLIC_R2_PUBLIC_URL) ? (
-                      <Image
-                        src={photo.url}
-                        alt=""
-                        width={72}
-                        height={72}
-                        className="w-[72px] h-[72px] object-cover"
-                      />
-                    ) : (
-                      /* eslint-disable-next-line @next/next/no-img-element -- Fallback for non-R2 URLs */
-                      <img
-                        src={photo.url}
-                        alt=""
-                        width={72}
-                        height={72}
-                        className="w-[72px] h-[72px] object-cover"
-                      />
-                    )}
-                  </a>
-                ))}
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground">
-                <ImageIcon className="h-3.5 w-3.5" />
-                No photos
-              </div>
-            )}
-          </li>
-        );
-      })}
-    </ul>
   );
 }
 

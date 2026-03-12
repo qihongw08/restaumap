@@ -16,9 +16,10 @@ export function VisitForm({ restaurantId }: VisitFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [visitDate, setVisitDate] = useState(() =>
-    new Date().toISOString().slice(0, 10),
-  );
+  const [visitDate, setVisitDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
   const [fullnessScore, setFullnessScore] = useState(5);
   const [tasteScore, setTasteScore] = useState(5);
   const [pricePaid, setPricePaid] = useState("");
@@ -95,7 +96,6 @@ export function VisitForm({ restaurantId }: VisitFormProps) {
               className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
             />
           </div>
-
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
@@ -153,13 +153,13 @@ export function VisitForm({ restaurantId }: VisitFormProps) {
         </div>
 
         {validPrice && (
-          <div className="flex items-center justify-between rounded-2xl bg-primary px-6 py-4 shadow-lg animate-in zoom-in duration-300">
-            <span className="text-xs font-black uppercase tracking-widest text-primary-foreground opacity-80">
+          <div className="animate-in zoom-in-75 duration-300 rounded-2xl bg-primary px-6 py-5 text-center shadow-[0_8px_24px_rgba(255,215,0,0.4)]">
+            <p className="text-[10px] font-black uppercase tracking-widest text-primary-foreground/70">
               PF RATIO™
-            </span>
-            <span className="text-2xl font-black italic text-primary-foreground tracking-tighter">
+            </p>
+            <p className="text-5xl font-black italic tracking-tighter text-primary-foreground">
               {pfRatio.toFixed(2)}
-            </span>
+            </p>
           </div>
         )}
 

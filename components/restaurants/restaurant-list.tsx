@@ -1,28 +1,71 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { RestaurantCard } from "@/components/restaurants/restaurant-card";
 import { RemoveRestaurantModal } from "@/components/restaurants/remove-restaurant-modal";
 import { Loading } from "@/components/shared/loading";
 import { useRestaurants } from "@/hooks/use-restaurants";
 import type { RestaurantWithVisits } from "@/types/restaurant";
+import { Loader2 } from "lucide-react";
 
 interface RestaurantListProps {
   status?: string;
   excludeBlacklisted?: boolean;
   initialRestaurants?: RestaurantWithVisits[];
+  initialCursor?: string | null;
 }
 
 export function RestaurantList({
   status,
   excludeBlacklisted = true,
   initialRestaurants,
+  initialCursor = null,
 }: RestaurantListProps) {
-  const { restaurants, isLoading, error, refetch } = useRestaurants({
+  const { restaurants: baseRestaurants, isLoading, error, refetch } = useRestaurants({
     status,
     excludeBlacklisted,
     initialData: initialRestaurants,
   });
+
+  // Pagination state for loading more
+  const [extraRestaurants, setExtraRestaurants] = useState<RestaurantWithVisits[]>([]);
+  const [cursor, setCursor] = useState<string | null>(initialCursor);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  const restaurants = [...baseRestaurants, ...extraRestaurants];
+
+  const loadMore = useCallback(async () => {
+    if (!cursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const params = new URLSearchParams({ limit: "10", cursor });
+      if (status) params.set("status", status);
+      if (!excludeBlacklisted) params.set("excludeBlacklisted", "false");
+      const res = await fetch(`/api/restaurants?${params}`);
+      if (!res.ok) return;
+      const json = await res.json();
+      setExtraRestaurants((prev) => [...prev, ...(json.data ?? [])]);
+      setCursor(json.nextCursor ?? null);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [cursor, loadingMore, status, excludeBlacklisted]);
+
+  // IntersectionObserver for infinite scroll
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !cursor) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadMore();
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [cursor, loadMore]);
+
   const [removeTarget, setRemoveTarget] = useState<{
     id: string;
     name: string;
@@ -37,7 +80,10 @@ export function RestaurantList({
     const res = await fetch(`/api/restaurants/${removeTarget.id}`, {
       method: "DELETE",
     });
-    if (res.ok) refetch();
+    if (res.ok) {
+      setExtraRestaurants((prev) => prev.filter((r) => r.id !== removeTarget.id));
+      refetch();
+    }
   };
 
   if (isLoading) return <Loading />;
@@ -83,6 +129,14 @@ export function RestaurantList({
           </li>
         ))}
       </ul>
+
+      {/* Infinite scroll sentinel */}
+      {cursor && (
+        <div ref={sentinelRef} className="flex justify-center py-6">
+          {loadingMore && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+        </div>
+      )}
+
       <RemoveRestaurantModal
         open={!!removeTarget}
         onClose={() => setRemoveTarget(null)}

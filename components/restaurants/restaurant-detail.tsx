@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { RestaurantWithDetails } from "@/types/restaurant";
 import { ChevronRight, MapPin, Plus, Clock, DollarSign } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { calculatePFRatio, cn } from "@/lib/utils";
 import { PFRatioDisplay } from "@/components/visits/pf-ratio-display";
 import { LogVisitModal } from "@/components/visits/log-visit-modal";
 import Image from "next/image";
@@ -40,6 +41,7 @@ export function RestaurantDetail({ restaurant }: RestaurantDetailProps) {
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
   const [logVisitOpen, setLogVisitOpen] = useState(false);
   const googleMapsUrl = getGoogleMapsUrl(restaurant);
+  const router = useRouter();
 
   const photoRefs = restaurant.photoReferences ?? [];
   const mainPhotoRef = photoRefs[selectedPhotoIndex] ?? null;
@@ -87,19 +89,17 @@ export function RestaurantDetail({ restaurant }: RestaurantDetailProps) {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
-        {/* Floating Actions */}
         <div className="absolute top-12 left-6 right-6 flex items-center justify-between">
-          <Link href="/">
-            <button className="flex h-10 w-10 items-center justify-center rounded-full bg-background/20 text-foreground backdrop-blur-md transition-colors hover:bg-background/40">
-              <ChevronRight className="h-6 w-6 rotate-180" />
-            </button>
-          </Link>
-          <div className="flex gap-2">
-            {/* Functional actions could go here (e.g., Bookmark) */}
-          </div>
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-background/20 text-foreground backdrop-blur-md transition-colors hover:bg-background/40"
+          >
+            <ChevronRight className="h-6 w-6 rotate-180" />
+          </button>
+          <div className="flex gap-2"></div>
         </div>
 
-        {/* Floating Title Info */}
         <div className="absolute bottom-6 left-6 right-6 space-y-2">
           {(restaurant.sourceUrl ?? restaurant.savedAt) && (
             <div className="flex items-center gap-2 mb-6">
@@ -204,6 +204,42 @@ export function RestaurantDetail({ restaurant }: RestaurantDetailProps) {
           <h2 className="text-xl font-black italic tracking-tighter text-foreground">
             Your Food Journey
           </h2>
+          {restaurant.visits.length >= 2 &&
+            (() => {
+              const pfScores = restaurant.visits.map((v) =>
+                calculatePFRatio(
+                  Number(v.fullnessScore),
+                  Number(v.tasteScore),
+                  Number(v.pricePaid),
+                ),
+              );
+              const avg = pfScores.reduce((a, b) => a + b, 0) / pfScores.length;
+              const best = Math.max(...pfScores);
+              return (
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    {
+                      label: "VISITS",
+                      value: restaurant.visits.length.toString(),
+                    },
+                    { label: "AVG PF", value: avg.toFixed(1) },
+                    { label: "BEST PF", value: best.toFixed(2) },
+                  ].map(({ label, value }) => (
+                    <div
+                      key={label}
+                      className="rounded-2xl border border-border bg-muted/50 p-3 text-center"
+                    >
+                      <p className="text-2xl font-black italic leading-none text-primary">
+                        {value}
+                      </p>
+                      <p className="mt-1 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                        {label}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           <PFRatioDisplay
             visits={restaurant.visits}
             restaurantId={restaurant.id}

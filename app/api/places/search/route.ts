@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const name = body.name ?? "";
-    const addressOrRegion = extractCityStateZip(body.addressOrRegion) ?? "";
+    const addressOrRegion = body.addressOrRegion ? extractCityStateZip(body.addressOrRegion) : "";
     const query = [name, addressOrRegion].filter(Boolean).join(", ");
     if (!query.trim()) {
       return NextResponse.json(

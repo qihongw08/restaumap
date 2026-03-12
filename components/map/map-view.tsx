@@ -1,60 +1,85 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import useSWR from "swr";
 import { RestaurantMap } from "@/components/map/restaurant-map";
 import { NearbyBottomSheet } from "@/components/map/nearby-bottom-sheet";
+import { VisitLogCard } from "@/components/visits/visit-log-card";
+import type { MarkerData } from "@/types/restaurant";
+import type { VisitLogMarker, VisitLogWithLocation } from "@/types/visit";
 import type { RestaurantWithDetails } from "@/types/restaurant";
+import { Loader2 } from "lucide-react";
 
 const DEFAULT_CENTER = { lat: 40.7, lng: -74 };
 const DEFAULT_ZOOM = 10;
 const SELECTED_ZOOM = 15;
 
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
 interface MapViewProps {
-  restaurants: RestaurantWithDetails[];
+  markers?: MarkerData[];
+  visitLogMarkers?: VisitLogMarker[];
   highlightRestaurantId?: string | null;
   selectedGroupId?: string | null;
   groupOptions?: Array<{ id: string; name: string }>;
   shareToken?: string | null;
+  /** Share pages pass full restaurant data; markers are derived from it */
+  restaurants?: RestaurantWithDetails[];
   showPhotos?: boolean;
 }
 
 export function MapView({
-  restaurants,
+  markers: markersProp,
+  visitLogMarkers = [],
   highlightRestaurantId = null,
   selectedGroupId = null,
   groupOptions = [],
   shareToken = null,
+  restaurants,
   showPhotos = true,
 }: MapViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [selectedRestaurantId, setSelectedRestaurantId] = useState<
-    string | null
-  >(null);
+
+  // Derive markers from restaurants prop when markers aren't provided (share pages)
+  const markers: MarkerData[] = useMemo(() => {
+    if (markersProp) return markersProp;
+    if (restaurants) {
+      return restaurants.map((r) => ({
+        id: r.id,
+        name: r.name,
+        latitude: r.latitude,
+        longitude: r.longitude,
+        status: r.status,
+      }));
+    }
+    return [];
+  }, [markersProp, restaurants]);
+
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER);
   const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM);
   const [groupMenuOpen, setGroupMenuOpen] = useState(false);
+  const [mapMode, setMapMode] = useState<"spots" | "logs">("spots");
+  const [selectedLogRestaurantId, setSelectedLogRestaurantId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (
-      !highlightRestaurantId ||
-      !restaurants.some((r) => r.id === highlightRestaurantId)
-    )
+    if (!highlightRestaurantId || !markers.some((m) => m.id === highlightRestaurantId))
       return;
     const id = highlightRestaurantId;
-    const rest = restaurants.find((r) => r.id === id);
+    const marker = markers.find((m) => m.id === id);
     const t = setTimeout(() => {
       setSelectedRestaurantId(id);
       setSheetOpen(true);
-      if (rest?.latitude != null && rest?.longitude != null) {
-        setMapCenter({ lat: rest.latitude, lng: rest.longitude });
+      if (marker?.latitude != null && marker?.longitude != null) {
+        setMapCenter({ lat: marker.latitude, lng: marker.longitude });
         setMapZoom(SELECTED_ZOOM);
       }
     }, 0);
     return () => clearTimeout(t);
-  }, [highlightRestaurantId, restaurants]);
+  }, [highlightRestaurantId, markers]);
 
   const getRestaurantHref = useCallback(
     (id: string) =>
@@ -70,21 +95,35 @@ export function MapView({
         router.push(getRestaurantHref(id));
         return;
       }
-      const rest = restaurants.find((r) => r.id === id);
-      if (rest?.latitude != null && rest?.longitude != null) {
-        setMapCenter({ lat: rest.latitude, lng: rest.longitude });
+      const marker = markers.find((m) => m.id === id);
+      if (marker?.latitude != null && marker?.longitude != null) {
+        setMapCenter({ lat: marker.latitude, lng: marker.longitude });
         setMapZoom(SELECTED_ZOOM);
       }
       setSelectedRestaurantId(id);
       setSheetOpen(true);
     },
-    [selectedRestaurantId, restaurants, router, getRestaurantHref],
+    [selectedRestaurantId, markers, router, getRestaurantHref],
+  );
+
+  const handleLogMarkerClick = useCallback(
+    (restaurantId: string) => {
+      const marker = visitLogMarkers.find((v) => v.restaurantId === restaurantId);
+      if (marker) {
+        setMapCenter({
+          lat: marker.restaurant.latitude,
+          lng: marker.restaurant.longitude,
+        });
+        setMapZoom(SELECTED_ZOOM);
+      }
+      setSelectedLogRestaurantId(restaurantId);
+      setSheetOpen(true);
+    },
+    [visitLogMarkers],
   );
 
   const handleCameraChange = useCallback(
-    (ev: {
-      detail: { center?: { lat: number; lng: number }; zoom?: number };
-    }) => {
+    (ev: { detail: { center?: { lat: number; lng: number }; zoom?: number } }) => {
       const { center, zoom } = ev.detail ?? {};
       if (center) setMapCenter(center);
       if (typeof zoom === "number") setMapZoom(zoom);
@@ -92,26 +131,12 @@ export function MapView({
     [],
   );
 
-  const handleRestaurantClick = useCallback(
-    (id: string) => {
-      if (selectedRestaurantId === id) {
-        router.push(getRestaurantHref(id));
-        return;
-      }
-      const rest = restaurants.find((r) => r.id === id);
-      if (rest?.latitude != null && rest?.longitude != null) {
-        setMapCenter({ lat: rest.latitude, lng: rest.longitude });
-        setMapZoom(SELECTED_ZOOM);
-      }
-      setSelectedRestaurantId(id);
-      setSheetOpen(true);
-    },
-    [selectedRestaurantId, restaurants, router, getRestaurantHref],
-  );
-
   const handleSheetOpenChange = (open: boolean) => {
     setSheetOpen(open);
-    if (!open) setSelectedRestaurantId(null);
+    if (!open) {
+      setSelectedRestaurantId(null);
+      setSelectedLogRestaurantId(null);
+    }
   };
 
   const handleGroupChange = (nextGroupId: string) => {
@@ -124,76 +149,273 @@ export function MapView({
   };
 
   const selectedGroupName =
-    groupOptions.find((group) => group.id === selectedGroupId)?.name ??
-    "All restaurants";
+    groupOptions.find((group) => group.id === selectedGroupId)?.name ?? "All";
+
+  // Group visit log markers by restaurant
+  const groupedLogMarkers = useMemo(() => {
+    return visitLogMarkers.reduce<
+      Record<string, { restaurant: VisitLogMarker["restaurant"]; markers: VisitLogMarker[]; latestPhoto?: string }>
+    >((acc, v) => {
+      if (!acc[v.restaurantId]) {
+        acc[v.restaurantId] = {
+          restaurant: v.restaurant,
+          markers: [],
+          latestPhoto: v.firstPhotoUrl ?? undefined,
+        };
+      }
+      acc[v.restaurantId].markers.push(v);
+      return acc;
+    }, {});
+  }, [visitLogMarkers]);
+
+  // For backward compat with share pages that pass full restaurants
+  const handleRestaurantClick = useCallback(
+    (id: string) => {
+      if (selectedRestaurantId === id) {
+        router.push(getRestaurantHref(id));
+        return;
+      }
+      const rest = restaurants?.find((r) => r.id === id);
+      if (rest?.latitude != null && rest?.longitude != null) {
+        setMapCenter({ lat: rest.latitude, lng: rest.longitude });
+        setMapZoom(SELECTED_ZOOM);
+      }
+      setSelectedRestaurantId(id);
+      setSheetOpen(true);
+    },
+    [selectedRestaurantId, restaurants, router, getRestaurantHref],
+  );
 
   return (
     <>
-      {groupOptions.length > 0 && (
-        <div className="pointer-events-none absolute left-1/2 top-28 z-[60] w-[calc(100%-2rem)] max-w-[250px] -translate-x-1/2">
-          <div className="pointer-events-auto relative flex items-center gap-2 rounded-xl border border-primary/20 bg-background/95 px-3 py-2 shadow-lg backdrop-blur">
-            <p className="shrink-0 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-              Group
-            </p>
-            <div className="min-w-0 flex-1">
-              <button
-                type="button"
-                onClick={() => setGroupMenuOpen((open) => !open)}
-                className="flex w-full min-w-0 items-center justify-between gap-2 rounded-md bg-background px-2 py-1 text-xs font-semibold text-foreground"
-                aria-label="Choose group for map"
-                aria-expanded={groupMenuOpen}
-              >
-                <span className="min-w-0 flex-1 overflow-hidden text-left">
-                  <span className="line-clamp-1 block">
-                    {selectedGroupName}
+      {/* Group selector + Spots/Logs toggle — unified control */}
+      <div className="pointer-events-none absolute left-1/2 top-28 z-[60] w-[calc(100%-2rem)] max-w-[260px] -translate-x-1/2">
+        <div className="pointer-events-auto relative space-y-2 rounded-xl border border-primary/20 bg-background/95 px-3 py-2 shadow-lg backdrop-blur">
+          {groupOptions.length > 0 && (
+            <div className="flex items-center gap-2">
+              <p className="shrink-0 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                Group
+              </p>
+              <div className="min-w-0 flex-1">
+                <button
+                  type="button"
+                  onClick={() => setGroupMenuOpen((o) => !o)}
+                  className="flex w-full min-w-0 items-center justify-between gap-2 rounded-md bg-background px-2 py-1 text-xs font-semibold text-foreground"
+                  aria-label="Choose group for map"
+                  aria-expanded={groupMenuOpen}
+                >
+                  <span className="min-w-0 flex-1 overflow-hidden text-left">
+                    <span className="line-clamp-1 block">{selectedGroupName}</span>
                   </span>
-                </span>
-                <span className="shrink-0 text-[10px] text-muted-foreground">
-                  {groupMenuOpen ? "▲" : "▼"}
-                </span>
-              </button>
-
-              {groupMenuOpen && (
-                <div className="absolute left-[58px] right-3 top-[calc(100%+6px)] max-h-48 overflow-y-auto rounded-lg bg-background p-1 shadow-xl">
-                  <button
-                    type="button"
-                    onClick={() => handleGroupChange("")}
-                    className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-foreground hover:bg-muted/60"
-                  >
-                    <span className="line-clamp-1 block">All restaurants</span>
-                  </button>
-                  {groupOptions.map((group) => (
+                  <span className="shrink-0 text-[10px] text-muted-foreground">
+                    {groupMenuOpen ? "▲" : "▼"}
+                  </span>
+                </button>
+                {groupMenuOpen && (
+                  <div className="absolute left-3 right-3 top-[calc(100%+6px)] max-h-48 overflow-y-auto rounded-lg bg-background p-1 shadow-xl">
                     <button
-                      key={group.id}
                       type="button"
-                      onClick={() => handleGroupChange(group.id)}
+                      onClick={() => handleGroupChange("")}
                       className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-foreground hover:bg-muted/60"
                     >
-                      <span className="line-clamp-1 block">{group.name}</span>
+                      <span className="line-clamp-1 block">All</span>
                     </button>
-                  ))}
-                </div>
-              )}
+                    {groupOptions.map((group) => (
+                      <button
+                        key={group.id}
+                        type="button"
+                        onClick={() => handleGroupChange(group.id)}
+                        className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-foreground hover:bg-muted/60"
+                      >
+                        <span className="line-clamp-1 block">{group.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {visitLogMarkers.length > 0 && (
+            <div className="flex rounded-full bg-muted/50 p-0.5">
+              <button
+                type="button"
+                onClick={() => { setMapMode("spots"); setSelectedLogRestaurantId(null); }}
+                className={`flex-1 rounded-full py-1.5 text-[10px] font-black uppercase tracking-widest transition-all ${
+                  mapMode === "spots"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Spots
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMapMode("logs"); setSelectedRestaurantId(null); }}
+                className={`flex-1 rounded-full py-1.5 text-[10px] font-black uppercase tracking-widest transition-all ${
+                  mapMode === "logs"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Logs
+              </button>
+            </div>
+          )}
         </div>
-      )}
+      </div>
+
       <RestaurantMap
-        restaurants={restaurants}
+        markers={mapMode === "spots" ? markers : []}
         selectedRestaurantId={selectedRestaurantId}
         onMarkerClick={handleMarkerClick}
         center={mapCenter}
         zoom={mapZoom}
         onCameraChanged={handleCameraChange}
+        visitLogGroups={mapMode === "logs" ? groupedLogMarkers : undefined}
+        selectedLogRestaurantId={selectedLogRestaurantId}
+        onLogMarkerClick={handleLogMarkerClick}
       />
-      <NearbyBottomSheet
-        restaurants={restaurants}
-        highlightedRestaurantId={selectedRestaurantId}
-        isOpen={sheetOpen}
-        onOpenChange={handleSheetOpenChange}
-        onRestaurantClick={handleRestaurantClick}
-        showPhotos={showPhotos}
-      />
+
+      {mapMode === "spots" ? (
+        restaurants ? (
+          /* Share pages pass full restaurant data */
+          <NearbyBottomSheet
+            restaurants={restaurants}
+            highlightedRestaurantId={selectedRestaurantId}
+            isOpen={sheetOpen}
+            onOpenChange={handleSheetOpenChange}
+            onRestaurantClick={handleRestaurantClick}
+            showPhotos={showPhotos}
+          />
+        ) : (
+          /* Normal map: bottom sheet fetches its own restaurant data */
+          <SWRBottomSheet
+            highlightedRestaurantId={selectedRestaurantId}
+            isOpen={sheetOpen}
+            onOpenChange={handleSheetOpenChange}
+            onRestaurantClick={handleMarkerClick}
+          />
+        )
+      ) : (
+        <LogsBottomSheet
+          restaurantId={selectedLogRestaurantId}
+          isOpen={sheetOpen && selectedLogRestaurantId !== null}
+          onOpenChange={handleSheetOpenChange}
+        />
+      )}
     </>
+  );
+}
+
+/** Bottom sheet that fetches restaurant data via SWR with server-side filters */
+function SWRBottomSheet({
+  highlightedRestaurantId,
+  isOpen,
+  onOpenChange,
+  onRestaurantClick,
+}: {
+  highlightedRestaurantId: string | null;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  onRestaurantClick: (id: string) => void;
+}) {
+  const [category, setCategory] = useState("All");
+  const [priceRange, setPriceRange] = useState<string | null>(null);
+
+  // Fetch available cuisines once
+  const { data: cuisinesData } = useSWR<{ data: string[] }>(
+    "/api/restaurants/cuisines",
+    fetcher,
+  );
+  const cuisines = cuisinesData?.data ?? [];
+
+  // Build API URL with filters — SWR refetches when key changes
+  const apiUrl = useMemo(() => {
+    const params = new URLSearchParams({ limit: "10" });
+    if (category !== "All") params.set("cuisine", category);
+    if (priceRange) params.set("priceRange", priceRange);
+    return `/api/restaurants?${params}`;
+  }, [category, priceRange]);
+
+  const { data } = useSWR<{ data: RestaurantWithDetails[] }>(apiUrl, fetcher);
+  const restaurants = (data?.data ?? []) as RestaurantWithDetails[];
+
+  return (
+    <NearbyBottomSheet
+      restaurants={restaurants}
+      highlightedRestaurantId={highlightedRestaurantId}
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      onRestaurantClick={onRestaurantClick}
+      controlledCategory={category}
+      onCategoryChange={setCategory}
+      controlledPriceRange={priceRange}
+      onPriceRangeChange={setPriceRange}
+      cuisines={cuisines}
+    />
+  );
+}
+
+/** Fetches visit logs for a restaurant and displays them */
+function LogsBottomSheet({
+  restaurantId,
+  isOpen,
+  onOpenChange,
+}: {
+  restaurantId: string | null;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { data, isLoading } = useSWR<{ data: VisitLogWithLocation[] }>(
+    restaurantId ? `/api/visits?restaurantId=${restaurantId}&limit=10` : null,
+    fetcher,
+  );
+
+  if (!isOpen || !restaurantId) return null;
+
+  const visits = data?.data ?? [];
+
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-[60] max-h-[70vh] overflow-y-auto rounded-t-[2rem] border-t border-black/10 bg-background shadow-2xl">
+      <div className="flex justify-center pt-3 pb-1">
+        <div className="h-1 w-10 rounded-full bg-muted-foreground/30" />
+      </div>
+      <div className="px-4 pb-6 pt-2">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground">
+            Visit logs
+          </h3>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="rounded-full px-3 py-1 text-xs font-bold text-muted-foreground hover:bg-muted"
+          >
+            Close
+          </button>
+        </div>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : visits.length === 0 ? (
+          <p className="py-4 text-sm text-muted-foreground">No visits logged here yet.</p>
+        ) : (
+          <ul className="space-y-4">
+            {visits.map((v) => (
+              <li key={v.id}>
+                <VisitLogCard
+                  visit={{
+                    ...v,
+                    restaurant: { id: v.restaurant.id, name: v.restaurant.name },
+                  }}
+                  editable
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
   );
 }

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { calculatePFRatio, clampScore, cn } from "@/lib/utils";
 import { PF_RATIO_FULLNESS_MAX, PF_RATIO_TASTE_MAX } from "@/lib/constants";
-import { Plus, X } from "lucide-react";
+import { ImageIcon, Plus, X } from "lucide-react";
 
 interface LogVisitModalProps {
   open: boolean;
@@ -30,9 +30,10 @@ export function LogVisitModal({
   const [error, setError] = useState<string | null>(null);
   const [groups, setGroups] = useState<GroupOption[]>([]);
 
-  const [visitDate, setVisitDate] = useState(() =>
-    new Date().toISOString().slice(0, 10),
-  );
+  const [visitDate, setVisitDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
   const [fullnessScore, setFullnessScore] = useState(5);
   const [tasteScore, setTasteScore] = useState(5);
   const [pricePaid, setPricePaid] = useState("");
@@ -230,13 +231,13 @@ export function LogVisitModal({
         </div>
 
         {validPrice && (
-          <div className="flex items-center justify-between rounded-2xl bg-primary px-6 py-4 shadow-lg">
-            <span className="text-xs font-black uppercase tracking-widest text-primary-foreground opacity-80">
+          <div className="animate-in zoom-in-75 duration-300 rounded-2xl bg-primary px-6 py-5 text-center shadow-[0_8px_24px_rgba(255,215,0,0.4)]">
+            <p className="text-[10px] font-black uppercase tracking-widest text-primary-foreground/70">
               PF RATIO™
-            </span>
-            <span className="text-2xl font-black italic text-primary-foreground tracking-tighter">
+            </p>
+            <p className="text-5xl font-black italic tracking-tighter text-primary-foreground">
               {pfRatio.toFixed(2)}
-            </span>
+            </p>
           </div>
         )}
 
@@ -265,49 +266,62 @@ export function LogVisitModal({
           </div>
         )}
 
-        <div className="space-y-2">
+        <div className="space-y-3">
           <label className="block text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-            PHOTOS (OPTIONAL)
+            PHOTOS{" "}
+            <span className="ml-1 font-medium normal-case text-muted-foreground/60">
+              ({photoFiles.length}/10)
+            </span>
           </label>
-          <div className="flex flex-wrap gap-2">
-            {photoFiles.map((file, i) => (
-              <div
-                key={`${file.name}-${i}`}
-                className="relative rounded-lg border-2 border-border bg-muted overflow-hidden"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element -- Local blob preview */}
-                <img
-                  src={URL.createObjectURL(file)}
-                  alt=""
-                  className="h-20 w-20 object-cover"
-                />
-                <button
-                  type="button"
-                  onClick={() => removePhotoFile(i)}
-                  className="absolute top-1 right-1 rounded-full bg-background/90 p-1 text-muted-foreground hover:text-foreground"
-                  aria-label="Remove photo"
+          {photoFiles.length === 0 ? (
+            <label className="flex h-32 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-muted bg-muted/20 text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/5">
+              <ImageIcon className="h-8 w-8 opacity-40" />
+              <span className="text-xs font-bold">Tap to add photos</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                multiple
+                className="sr-only"
+                onChange={handlePhotoChange}
+              />
+            </label>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              {photoFiles.map((file, i) => (
+                <div
+                  key={`${file.name}-${i}`}
+                  className="relative aspect-square overflow-hidden rounded-xl border-2 border-border"
                 >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ))}
-            {photoFiles.length < 10 && (
-              <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted bg-muted/30 text-muted-foreground hover:border-primary/50 hover:bg-muted/50">
-                <Plus className="h-6 w-6" />
-                <span className="mt-1 text-[10px] font-bold">Add</span>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  multiple
-                  className="sr-only"
-                  onChange={handlePhotoChange}
-                />
-              </label>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Upload up to 10 images (JPEG, PNG, WebP, GIF). Max 10 MB each.
-          </p>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- Local blob preview */}
+                  <img
+                    src={URL.createObjectURL(file)}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removePhotoFile(i)}
+                    className="absolute right-1.5 top-1.5 rounded-full bg-background/90 p-1.5 text-muted-foreground shadow-sm hover:text-foreground"
+                    aria-label="Remove photo"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              {photoFiles.length < 10 && (
+                <label className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-muted bg-muted/20 text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/5">
+                  <Plus className="h-6 w-6" />
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    multiple
+                    className="sr-only"
+                    onChange={handlePhotoChange}
+                  />
+                </label>
+              )}
+            </div>
+          )}
         </div>
 
         <Input

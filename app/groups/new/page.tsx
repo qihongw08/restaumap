@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { Nav } from '@/components/shared/nav';
 import { Button } from '@/components/ui/button';
 import { ChevronRight } from 'lucide-react';
@@ -41,12 +40,13 @@ export default function NewGroupPage() {
     <div className="min-h-screen bg-background pb-32">
       <div className="h-32 w-full" />
       <main className="mx-auto max-w-lg px-6">
-        <Link
-          href="/groups"
+        <button
+          type="button"
+          onClick={() => router.back()}
           className="mb-6 inline-flex items-center gap-1 text-sm font-bold text-muted-foreground hover:text-foreground"
         >
           <ChevronRight className="h-4 w-4 rotate-180" /> Back to groups
-        </Link>
+        </button>
         <h1 className="text-2xl font-black italic tracking-tighter text-foreground uppercase">
           New group
         </h1>

@@ -3,6 +3,58 @@ import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { isValidFullnessOrTaste, isValidPrice } from '@/lib/utils';
 
+export async function GET(request: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  try {
+    const searchParams = request.nextUrl.searchParams;
+    const limitParam = searchParams.get('limit');
+    const cursor = searchParams.get('cursor');
+    const groupId = searchParams.get('groupId') || undefined;
+    const restaurantId = searchParams.get('restaurantId') || undefined;
+    const limit = Math.min(Math.max(Number(limitParam) || 10, 1), 50);
+
+    const items = await prisma.visit.findMany({
+      where: {
+        userId: user.id,
+        ...(groupId ? { groupId } : {}),
+        ...(restaurantId ? { restaurantId } : {}),
+      },
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      orderBy: { visitDate: 'desc' },
+      include: {
+        restaurant: { select: { id: true, name: true } },
+        photos: { select: { id: true, url: true } },
+      },
+    });
+
+    const hasMore = items.length > limit;
+    const page = hasMore ? items.slice(0, limit) : items;
+
+    const data = page.map((v) => ({
+      id: v.id,
+      userId: v.userId,
+      restaurantId: v.restaurantId,
+      visitDate: v.visitDate.toISOString(),
+      fullnessScore: Number(v.fullnessScore),
+      tasteScore: Number(v.tasteScore),
+      pricePaid: Number(v.pricePaid),
+      notes: v.notes,
+      photos: v.photos,
+      restaurant: v.restaurant,
+    }));
+
+    const nextCursor = hasMore ? page[page.length - 1].id : null;
+
+    return NextResponse.json({ data, nextCursor });
+  } catch (error) {
+    console.error('Get visits error:', error);
+    return NextResponse.json({ error: 'Failed to fetch visits' }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -72,7 +124,7 @@ export async function POST(request: NextRequest) {
           userId: user.id,
           restaurantId,
           groupId: bodyGroupId,
-          visitDate: new Date(visitDate),
+          visitDate: new Date(`${visitDate}T12:00:00`),
           fullnessScore: Number(fullnessScore),
           tasteScore: Number(tasteScore),
           pricePaid: Number(pricePaid),

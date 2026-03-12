@@ -4,7 +4,7 @@ import { useState } from "react";
 import { formatPFRatio, calculatePFRatio } from "@/lib/utils";
 import type { VisitWithPhotos } from "@/types/visit";
 import { format } from "date-fns";
-import { Calendar, ImageIcon, Pencil } from "lucide-react";
+import { Calendar, Pencil } from "lucide-react";
 import Image from "next/image";
 import { EditVisitModal } from "./edit-visit-modal";
 
@@ -24,9 +24,7 @@ export function PFRatioDisplay({
   restaurantId,
   editable = false,
 }: PFRatioDisplayProps) {
-  const [editingVisit, setEditingVisit] = useState<VisitWithPhotos | null>(
-    null,
-  );
+  const [editingVisit, setEditingVisit] = useState<VisitWithPhotos | null>(null);
 
   if (visits.length === 0) return null;
 
@@ -34,79 +32,87 @@ export function PFRatioDisplay({
     <>
       <ul className="mt-3 space-y-4">
         {visits.map((visit) => {
-          const fullness = Number(visit.fullnessScore);
-          const taste = Number(visit.tasteScore);
-          const price = Number(visit.pricePaid);
-          const pfRatio = calculatePFRatio(fullness, taste, price);
+          const pfRatio = calculatePFRatio(
+            Number(visit.fullnessScore),
+            Number(visit.tasteScore),
+            Number(visit.pricePaid),
+          );
           const photos = visit.photos ?? [];
           return (
             <li
               key={visit.id}
-              className="overflow-hidden rounded-xl border-2 border-border bg-card"
+              className="overflow-hidden rounded-2xl border border-black/10 bg-white shadow-[0_2px_12px_rgba(0,0,0,0.06)]"
             >
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/30 px-4 py-3">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="h-4 w-4 shrink-0" />
-                  {format(new Date(visit.visitDate), "MMM d, yyyy")}
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="text-right">
-                    <span className="font-black italic text-primary">
-                      PF {formatPFRatio(pfRatio)}
-                    </span>
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      ({fullness}F × {taste}T / ${price.toFixed(0)})
-                    </span>
-                  </div>
-                  {editable && (
-                    <button
-                      type="button"
-                      onClick={() => setEditingVisit(visit)}
-                      className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                      aria-label="Edit visit"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-              {photos.length > 0 ? (
-                <div className="flex flex-wrap gap-2 p-3">
+              {/* Photo strip — scrollable, shows all photos */}
+              {photos.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto p-3 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory">
                   {photos.map((photo) => (
                     <a
                       key={photo.url}
                       href={photo.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block shrink-0 overflow-hidden rounded-lg border border-border bg-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      className="block shrink-0 snap-start overflow-hidden rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30"
                     >
                       {isR2Url(photo.url) ? (
                         <Image
                           src={photo.url}
                           alt=""
-                          width={80}
-                          height={80}
-                          className="h-20 w-20 object-cover"
+                          width={192}
+                          height={192}
+                          className="h-48 w-48 object-cover"
                         />
                       ) : (
-                        /* eslint-disable-next-line @next/next/no-img-element -- Fallback for non-R2 (legacy) URLs */
+                        /* eslint-disable-next-line @next/next/no-img-element -- Fallback for non-R2 URLs */
                         <img
                           src={photo.url}
                           alt=""
-                          width={80}
-                          height={80}
-                          className="h-20 w-20 object-cover"
+                          className="h-48 w-48 object-cover"
                         />
                       )}
                     </a>
                   ))}
                 </div>
-              ) : (
-                <div className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground">
-                  <ImageIcon className="h-3.5 w-3.5" />
-                  No photos
+              )}
+
+              {/* Date + notes */}
+              {!photos.length && (
+                <div className="bg-gradient-to-br from-primary/10 to-transparent px-4 py-3.5">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
+                    <Calendar className="h-3.5 w-3.5 shrink-0" />
+                    {format(new Date(visit.visitDate), "MMMM d, yyyy")}
+                  </div>
                 </div>
               )}
+
+              {/* Footer */}
+              <div className="flex items-center gap-2 border-t border-black/5 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  {photos.length > 0 && (
+                    <p className="text-xs font-bold text-muted-foreground">
+                      {format(new Date(visit.visitDate), "MMMM d, yyyy")}
+                    </p>
+                  )}
+                  {visit.notes && (
+                    <p className="overflow-hidden text-ellipsis whitespace-nowrap text-xs italic text-muted-foreground">
+                      {visit.notes}
+                    </p>
+                  )}
+                </div>
+                <span className="shrink-0 rounded-full bg-primary/15 px-3 py-1 text-sm font-black italic text-primary">
+                  {formatPFRatio(pfRatio)}
+                </span>
+                {editable && (
+                  <button
+                    type="button"
+                    onClick={() => setEditingVisit(visit)}
+                    className="shrink-0 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground"
+                    aria-label="Edit visit"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
             </li>
           );
         })}

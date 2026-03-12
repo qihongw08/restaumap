@@ -13,6 +13,10 @@ const connectionUrl =
 
 // Dev uses a separate Postgres schema (e.g. restaumap-dev) so prod uses public
 const devSchema = process.env["POSTGRES_SCHEMA_DEV"] ?? "restaumap-dev";
+
+/** The Postgres schema used for all tables — needed for $queryRaw */
+export const dbSchema =
+  process.env.NODE_ENV === "production" ? "public" : devSchema;
 const adapter = new PrismaPg(
   { connectionString: connectionUrl! },
   {

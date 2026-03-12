@@ -29,7 +29,7 @@ export default async function GroupDetailPage({
   if (!group) notFound();
 
   const currentMember = group.members.find((m: GroupMember) => m.userId === user.id);
-  if (!currentMember) redirect("/groups");
+  if (!currentMember) redirect("/");
 
   const memberIds = group.members.map((m) => m.userId);
   const addedPairs = group.groupRestaurants.map((gr) => ({
@@ -37,8 +37,8 @@ export default async function GroupDetailPage({
     restaurantId: gr.restaurantId,
   }));
 
-  // Fetch users, source URLs, and visits in parallel (data-patterns: Promise.all)
-  const [users, userRestaurants, groupVisits] = await Promise.all([
+  // Fetch users and source URLs in parallel
+  const [users, userRestaurants] = await Promise.all([
     memberIds.length > 0
       ? prisma.user.findMany({
           where: { id: { in: memberIds } },
@@ -56,14 +56,6 @@ export default async function GroupDetailPage({
           select: { userId: true, restaurantId: true, sourceUrl: true },
         })
       : Promise.resolve([]),
-    prisma.visit.findMany({
-      where: { groupId: id },
-      orderBy: { visitDate: "desc" },
-      include: {
-        photos: { select: { id: true, url: true } },
-        restaurant: { select: { id: true, name: true } },
-      },
-    }),
   ]);
 
   const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
@@ -101,29 +93,11 @@ export default async function GroupDetailPage({
     sourceUrl: sourceUrlMap.get(`${gr.addedById}:${gr.restaurantId}`) ?? null,
   }));
 
-  const groupVisitsWithUser = groupVisits.map((v) => {
-    const u = userMap[v.userId];
-    return {
-      id: v.id,
-      userId: v.userId,
-      restaurantId: v.restaurantId,
-      visitDate: v.visitDate.toISOString(),
-      fullnessScore: v.fullnessScore,
-      tasteScore: Number(v.tasteScore),
-      pricePaid: Number(v.pricePaid),
-      notes: v.notes,
-      photos: v.photos,
-      restaurant: v.restaurant,
-      user: u ? { username: u.username, avatarUrl: u.avatarUrl ?? undefined } : null,
-    };
-  });
-
   const groupData = {
     id: group.id,
     name: group.name,
     members: membersWithUser,
     groupRestaurants: groupRestaurantsWithSource,
-    groupVisits: groupVisitsWithUser,
     currentUserId: user.id,
     currentMember: { role: currentMember.role },
   };

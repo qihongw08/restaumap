@@ -9,3 +9,8 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
   page: number;
   pageSize: number;
 }
+
+export interface CursorPaginatedResponse<T> {
+  data: T[];
+  nextCursor: string | null;
+}

@@ -1,81 +1,102 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { Nav } from "@/components/shared/nav";
-import { RestaurantList } from "@/components/restaurants/restaurant-list";
 import { DashboardHeader } from "@/components/home/dashboard-header";
+import { ImportButtons } from "@/components/home/import-buttons";
+import { GroupCards } from "@/components/home/group-cards";
+import { RecentActivity } from "@/components/home/recent-activity";
 import { getCurrentUser } from "@/lib/auth";
 import { getDbUser } from "@/lib/sync-user";
-import { ImportButtons } from "@/components/home/import-buttons";
 import { prisma } from "@/lib/prisma";
 
 export default async function Home() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const [dbUser, userRestaurants] = await Promise.all([
+  const [dbUser, groups, recentVisits, recentRestaurants] = await Promise.all([
     getDbUser(user.id),
+    prisma.group.findMany({
+      where: { members: { some: { userId: user.id } } },
+      include: {
+        _count: { select: { members: true, groupRestaurants: true } },
+        members: { take: 4 },
+      },
+      orderBy: { updatedAt: "desc" },
+    }),
+    prisma.visit.findMany({
+      where: { userId: user.id },
+      orderBy: { visitDate: "desc" },
+      take: 5,
+      include: {
+        restaurant: { select: { id: true, name: true } },
+        photos: { select: { url: true }, take: 1 },
+      },
+    }),
     prisma.userRestaurant.findMany({
       where: { userId: user.id, isBlacklisted: false },
       orderBy: { savedAt: "desc" },
+      take: 3,
       include: {
         restaurant: {
-          include: {
-            visits: {
-              where: { userId: user.id },
-              orderBy: { visitDate: "desc" },
-              take: 5,
-              include: { photos: true },
-            },
-          },
+          select: { id: true, name: true, formattedAddress: true },
         },
       },
     }),
   ]);
 
-  // Serialize Date objects before passing to the Client Component (rsc-boundaries rule)
-  const initialRestaurants = userRestaurants.map((ur) => ({
-    ...ur.restaurant,
-    createdAt: ur.restaurant.createdAt.toISOString(),
-    updatedAt: ur.restaurant.updatedAt.toISOString(),
-    status: ur.status,
-    isBlacklisted: ur.isBlacklisted,
-    sourceUrl: ur.sourceUrl,
-    visits: ur.restaurant.visits.map((v) => ({
-      ...v,
-      visitDate: v.visitDate.toISOString(),
-      createdAt: v.createdAt.toISOString(),
-      updatedAt: v.updatedAt.toISOString(),
-      photos: v.photos.map((p) => ({
-        ...p,
-        uploadedAt: p.uploadedAt.toISOString(),
-      })),
-    })),
+  // Fetch member avatars for group cards
+  const allMemberIds = [
+    ...new Set(groups.flatMap((g) => g.members.map((m) => m.userId))),
+  ];
+  const memberUsers =
+    allMemberIds.length > 0
+      ? await prisma.user.findMany({
+          where: { id: { in: allMemberIds } },
+          select: { id: true, username: true, avatarUrl: true },
+        })
+      : [];
+  const userMap = Object.fromEntries(memberUsers.map((u) => [u.id, u]));
+
+  const groupCards = groups.map((g) => ({
+    id: g.id,
+    name: g.name,
+    memberCount: g._count.members,
+    restaurantCount: g._count.groupRestaurants,
+    memberAvatars: g.members.map((m) => {
+      const u = userMap[m.userId];
+      return {
+        id: m.id,
+        avatarUrl: u?.avatarUrl ?? undefined,
+        username: u?.username ?? undefined,
+      };
+    }),
+  }));
+
+  const visitItems = recentVisits.map((v) => ({
+    id: v.id,
+    restaurantId: v.restaurantId,
+    restaurantName: v.restaurant.name,
+    visitDate: v.visitDate.toISOString(),
+    fullnessScore: Number(v.fullnessScore),
+    tasteScore: Number(v.tasteScore),
+    pricePaid: Number(v.pricePaid),
+    photoUrl: v.photos[0]?.url,
+  }));
+
+  const addedItems = recentRestaurants.map((ur) => ({
+    restaurantId: ur.restaurant.id,
+    restaurantName: ur.restaurant.name,
+    address: ur.restaurant.formattedAddress ?? undefined,
+    savedAt: ur.savedAt.toISOString(),
   }));
 
   return (
     <div className="min-h-screen bg-background pb-32">
       <div className="h-32 w-full" />
-      <main className="mx-auto max-w-lg px-6">
-        <div className="mb-10 space-y-6">
-          <DashboardHeader user={dbUser} isLoggedIn />
-
-          <ImportButtons />
-        </div>
-
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-black italic tracking-tight text-foreground">
-              Saved Restaurants
-            </h2>
-            <Link
-              href="/restaurants"
-              className="text-xs font-bold text-primary hover:underline uppercase tracking-widest"
-            >
-              View all
-            </Link>
-          </div>
-          <RestaurantList initialRestaurants={initialRestaurants} />
-        </section>
+      <main className="mx-auto max-w-lg px-6 space-y-8">
+        <DashboardHeader user={dbUser} isLoggedIn />
+        <ImportButtons />
+        <GroupCards groups={groupCards} />
+        <RecentActivity visits={visitItems} added={addedItems} />
       </main>
       <Nav />
     </div>
