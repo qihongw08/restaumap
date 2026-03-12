@@ -19,9 +19,11 @@ interface SearchResult {
 export function QuickLogVisit({
   open,
   onClose,
+  mode = "logVisit",
 }: {
   open: boolean;
   onClose: () => void;
+  mode?: "logVisit" | "addOnly";
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -39,7 +41,39 @@ export function QuickLogVisit({
     setResults([]);
 
     try {
-      // Search saved restaurants first
+      if (mode === "addOnly") {
+        let googleResults: SearchResult[] = [];
+        try {
+          const placesRes = await fetch("/api/places/search", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: q }),
+          });
+          if (placesRes.ok) {
+            const placesJson = await placesRes.json();
+            googleResults = (placesJson.data ?? []).map(
+              (p: {
+                placeId: string;
+                name: string;
+                formattedAddress?: string;
+                latitude?: number | null;
+                longitude?: number | null;
+              }) => ({
+                id: p.placeId,
+                name: p.name,
+                address: p.formattedAddress,
+                source: "google" as const,
+                latitude: p.latitude,
+                longitude: p.longitude,
+                googlePlaceId: p.placeId,
+              }),
+            );
+          }
+        } catch {}
+        setResults(googleResults);
+        return;
+      }
+
       const savedRes = await fetch(
         `/api/restaurants?limit=5&cuisine=${encodeURIComponent(q)}`,
       );
@@ -53,7 +87,6 @@ export function QuickLogVisit({
         }),
       );
 
-      // Also search by name match in saved restaurants
       const nameRes = await fetch(`/api/restaurants?limit=10`);
       const nameJson = await nameRes.json();
       const nameMatched: SearchResult[] = (nameJson.data ?? [])
@@ -67,14 +100,12 @@ export function QuickLogVisit({
           source: "saved" as const,
         }));
 
-      // Deduplicate saved results
       const savedMap = new Map<string, SearchResult>();
       for (const r of [...saved, ...nameMatched]) {
         savedMap.set(r.id, r);
       }
       const dedupedSaved = [...savedMap.values()];
 
-      // Search Google Places for new restaurants
       let googleResults: SearchResult[] = [];
       try {
         const placesRes = await fetch("/api/places/search", {
@@ -117,10 +148,16 @@ export function QuickLogVisit({
     } finally {
       setSearching(false);
     }
-  }, [query]);
+  }, [query, mode]);
 
   const handleSelectSaved = (restaurantId: string) => {
-    setSelectedRestaurantId(restaurantId);
+    if (mode === "addOnly") {
+      onClose();
+      router.push(`/restaurants/${restaurantId}`);
+      router.refresh();
+    } else {
+      setSelectedRestaurantId(restaurantId);
+    }
   };
 
   const handleSelectGoogle = async (result: SearchResult) => {
@@ -154,13 +191,19 @@ export function QuickLogVisit({
           popularDishes: enriched.popularDishes ?? [],
           priceRange: enriched.priceRange ?? null,
           ambianceTags: enriched.ambianceTags ?? [],
-          status: "VISITED",
+          status: mode === "addOnly" ? "WANT_TO_GO" : "VISITED",
         }),
       });
 
       if (createRes.ok) {
         const createJson = await createRes.json();
-        setSelectedRestaurantId(createJson.data.id);
+        if (mode === "addOnly") {
+          onClose();
+          router.push(`/restaurants/${createJson.data.id}`);
+          router.refresh();
+        } else {
+          setSelectedRestaurantId(createJson.data.id);
+        }
       }
     } finally {
       setSaving(false);
@@ -175,8 +218,8 @@ export function QuickLogVisit({
     router.refresh();
   };
 
-  // If a restaurant is selected, show the log visit modal
-  if (selectedRestaurantId) {
+  // If a restaurant is selected and we're in logVisit mode, show the log visit modal
+  if (mode === "logVisit" && selectedRestaurantId) {
     return (
       <LogVisitModal
         open
@@ -187,7 +230,11 @@ export function QuickLogVisit({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Log a visit">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={mode === "addOnly" ? "Add restaurant" : "Log a visit"}
+    >
       <div className="space-y-4">
         <form
           onSubmit={(e) => {

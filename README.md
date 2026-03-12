@@ -118,7 +118,7 @@ restaumap/
 │   ├── auth/                 # SignInWithGoogle
 │   ├── map/                  # MapView, RestaurantMap, NearbyBottomSheet, LocationButton
 │   ├── restaurants/          # RestaurantCard, RestaurantList, RestaurantDetail, RestaurantForm, BlacklistModal
-│   ├── visits/               # VisitForm, VisitCard, PFRatioDisplay
+│   ├── visits/               # VisitForm, VisitCard, VisitHistory
 │   └── pwa/                  # RegisterSW
 ├── lib/                      # prisma, groq, auth, supabase, utils, constants
 ├── types/

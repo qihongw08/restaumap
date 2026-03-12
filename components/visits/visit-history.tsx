@@ -13,18 +13,20 @@ function isR2Url(url: string) {
   return R2_BASE.length > 0 && url.startsWith(R2_BASE);
 }
 
-interface PFRatioDisplayProps {
+interface VisitHistoryProps {
   visits: VisitWithPhotos[];
   restaurantId: string;
   editable?: boolean;
 }
 
-export function PFRatioDisplay({
+export function VisitHistory({
   visits,
   restaurantId,
   editable = false,
-}: PFRatioDisplayProps) {
-  const [editingVisit, setEditingVisit] = useState<VisitWithPhotos | null>(null);
+}: VisitHistoryProps) {
+  const [editingVisit, setEditingVisit] = useState<VisitWithPhotos | null>(
+    null,
+  );
 
   if (visits.length === 0) return null;
 
@@ -75,7 +77,6 @@ export function PFRatioDisplay({
                 </div>
               )}
 
-              {/* Date + notes */}
               {!photos.length && (
                 <div className="bg-gradient-to-br from-primary/10 to-transparent px-4 py-3.5">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
@@ -85,12 +86,16 @@ export function PFRatioDisplay({
                 </div>
               )}
 
-              {/* Footer */}
               <div className="flex items-center gap-2 border-t border-black/5 px-4 py-3">
                 <div className="min-w-0 flex-1">
                   {photos.length > 0 && (
                     <p className="text-xs font-bold text-muted-foreground">
                       {format(new Date(visit.visitDate), "MMMM d, yyyy")}
+                    </p>
+                  )}
+                  {visit.group && (
+                    <p className="text-[10px] font-bold text-muted-foreground">
+                      {visit.group.name}
                     </p>
                   )}
                   {visit.notes && (

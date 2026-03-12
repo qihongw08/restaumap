@@ -22,6 +22,7 @@ interface VisitItem {
   tasteScore: number;
   pricePaid: number;
   photoUrl?: string;
+  groupName?: string;
 }
 
 interface AddedItem {
@@ -107,6 +108,11 @@ export function RecentActivity({ visits, added }: RecentActivityProps) {
                     </p>
                     <p className="text-[10px] text-muted-foreground">
                       Visited {daysAgoLabel(v.visitDate)}
+                      {v.groupName && (
+                        <span className="ml-1">
+                          · With <span className="font-semibold">{v.groupName}</span>
+                        </span>
+                      )}
                     </p>
                   </div>
                   <span className="shrink-0 rounded-full bg-primary/15 px-2.5 py-1 text-xs font-black italic text-primary">

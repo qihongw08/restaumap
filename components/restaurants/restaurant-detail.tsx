@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import type { RestaurantWithDetails } from "@/types/restaurant";
 import { ChevronRight, MapPin, Plus, Clock, DollarSign } from "lucide-react";
 import { calculatePFRatio } from "@/lib/utils";
-import { PFRatioDisplay } from "@/components/visits/pf-ratio-display";
+import { VisitHistory } from "@/components/visits/visit-history";
 import { LogVisitModal } from "@/components/visits/log-visit-modal";
 import { Button } from "@/components/ui/button";
 
@@ -192,7 +192,7 @@ export function RestaurantDetail({ restaurant }: RestaurantDetailProps) {
                 </div>
               );
             })()}
-          <PFRatioDisplay
+          <VisitHistory
             visits={restaurant.visits}
             restaurantId={restaurant.id}
             editable

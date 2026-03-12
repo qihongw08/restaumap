@@ -105,6 +105,7 @@ export async function GET(
       notes: v.notes,
       photos: v.photos,
       restaurant: v.restaurant,
+      group: { id: group.id, name: group.name },
       user: u
         ? { username: u.username, avatarUrl: u.avatarUrl ?? undefined }
         : null,

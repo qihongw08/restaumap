@@ -29,6 +29,7 @@ export default async function Home() {
       include: {
         restaurant: { select: { id: true, name: true } },
         photos: { select: { url: true }, take: 1 },
+        group: { select: { id: true, name: true } },
       },
     }),
     prisma.userRestaurant.findMany({
@@ -80,6 +81,7 @@ export default async function Home() {
     tasteScore: Number(v.tasteScore),
     pricePaid: Number(v.pricePaid),
     photoUrl: v.photos[0]?.url,
+    groupName: v.group?.name ?? undefined,
   }));
 
   const addedItems = recentRestaurants.map((ur) => ({

@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
       include: {
         restaurant: { select: { id: true, name: true } },
         photos: { select: { id: true, url: true } },
+        group: { select: { id: true, name: true } },
       },
     });
 
@@ -44,6 +45,7 @@ export async function GET(request: NextRequest) {
       notes: v.notes,
       photos: v.photos,
       restaurant: v.restaurant,
+      group: v.group ? { id: v.group.id, name: v.group.name } : null,
     }));
 
     const nextCursor = hasMore ? page[page.length - 1].id : null;

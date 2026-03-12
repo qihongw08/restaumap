@@ -7,6 +7,7 @@ export type VisitWithPhotos = Omit<Visit, "visitDate" | "createdAt" | "updatedAt
   createdAt: Date | string;
   updatedAt: Date | string;
   photos?: (Omit<Pick<Photo, "id" | "url" | "uploadedAt">, "uploadedAt"> & { uploadedAt: Date | string })[];
+  group?: { id: string; name: string } | null;
 };
 
 export interface VisitLogWithLocation {

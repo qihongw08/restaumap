@@ -7,26 +7,42 @@ import { Modal } from "@/components/ui/modal";
 import { ImportContent } from "@/app/import/import-content";
 import { QuickLogVisit } from "@/components/home/quick-log-visit";
 
+interface PrimaryButtonProps {
+  onClick: () => void;
+  label: string;
+  Icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+}
+
+function PrimaryHomeButton({ onClick, label, Icon }: PrimaryButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-xs font-black uppercase tracking-widest text-primary-foreground shadow-md transition-transform active:scale-95"
+    >
+      <Icon className="h-4 w-4" /> {label}
+    </button>
+  );
+}
+
 export function ImportButtons() {
   const [importOpen, setImportOpen] = useState(false);
   const [logVisitOpen, setLogVisitOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
 
   return (
     <>
       <div className="grid grid-cols-2 gap-3">
-        <button
-          type="button"
+        <PrimaryHomeButton
           onClick={() => setLogVisitOpen(true)}
-          className="flex items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-xs font-black uppercase tracking-widest text-primary-foreground shadow-md transition-transform active:scale-95"
-        >
-          <Utensils className="h-4 w-4" /> Log Visit
-        </button>
-        <Link
-          href="/restaurants/new"
-          className="flex items-center justify-center gap-2 rounded-2xl bg-muted px-4 py-3 text-xs font-black uppercase tracking-widest text-foreground shadow-md transition-transform active:scale-95"
-        >
-          <Plus className="h-4 w-4" /> Add New
-        </Link>
+          label="Log Visit"
+          Icon={Utensils}
+        />
+        <PrimaryHomeButton
+          onClick={() => setAddOpen(true)}
+          label="Add New"
+          Icon={Plus}
+        />
         <button
           type="button"
           onClick={() => setImportOpen(true)}
@@ -54,6 +70,11 @@ export function ImportButtons() {
       <QuickLogVisit
         open={logVisitOpen}
         onClose={() => setLogVisitOpen(false)}
+      />
+      <QuickLogVisit
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        mode="addOnly"
       />
     </>
   );

@@ -35,6 +35,7 @@ export default async function ProfilePage() {
       include: {
         restaurant: { select: { id: true, name: true } },
         photos: { select: { id: true, url: true } },
+        group: { select: { id: true, name: true } },
       },
     }),
   ]);
@@ -60,6 +61,7 @@ export default async function ProfilePage() {
     notes: v.notes,
     photos: v.photos,
     restaurant: v.restaurant,
+    group: v.group ? { id: v.group.id, name: v.group.name } : null,
   }));
 
   return (

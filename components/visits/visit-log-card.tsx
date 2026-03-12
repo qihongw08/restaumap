@@ -24,6 +24,7 @@ export interface VisitLogData {
   notes: string | null;
   photos: { id: string; url: string }[];
   restaurant: { id: string; name: string };
+  group?: { id: string; name: string } | null;
 }
 
 interface VisitLogCardProps {
@@ -97,16 +98,24 @@ export function VisitLogCard({
               </p>
             </Link>
           )}
-          <p className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+          <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span>{format(new Date(visit.visitDate), "MMMM d, yyyy")}</span>
             <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold">
               {(() => {
-                const days = differenceInCalendarDays(new Date(), new Date(visit.visitDate));
+                const days = differenceInCalendarDays(
+                  new Date(),
+                  new Date(visit.visitDate),
+                );
                 if (days === 0) return "Today";
                 if (days === 1) return "1 day ago";
                 return `${days} days ago`;
               })()}
             </span>
+            {visit.group && (
+              <span className="rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:text-indigo-300">
+                {visit.group.name}
+              </span>
+            )}
           </p>
           {visit.notes && (
             <p className="mt-1.5 text-xs italic text-muted-foreground line-clamp-2">
@@ -158,7 +167,7 @@ export function VisitLogCard({
           onClose={() => setEditing(false)}
           visit={{
             ...visit,
-            groupId: null,
+            groupId: visit.group?.id ?? null,
             createdAt: visit.visitDate,
             updatedAt: visit.visitDate,
             photos: visit.photos.map((p) => ({

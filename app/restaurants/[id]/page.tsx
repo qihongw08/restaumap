@@ -48,7 +48,7 @@ export default async function RestaurantDetailPage({
           visits: {
             where: { userId: user.id },
             orderBy: { visitDate: "desc" },
-            include: { photos: true },
+            include: { photos: true, group: { select: { id: true, name: true } } },
           },
           photos: { where: { userId: user.id } },
         },
@@ -101,7 +101,7 @@ export default async function RestaurantDetailPage({
       visits: {
         where: { userId: user.id },
         orderBy: { visitDate: "desc" },
-        include: { photos: true },
+        include: { photos: true, group: { select: { id: true, name: true } } },
       },
       photos: { where: { userId: user.id } },
     },

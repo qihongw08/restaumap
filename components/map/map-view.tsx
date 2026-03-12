@@ -57,16 +57,23 @@ export function MapView({
     return [];
   }, [markersProp, restaurants]);
 
-  const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState<
+    string | null
+  >(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER);
   const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM);
   const [groupMenuOpen, setGroupMenuOpen] = useState(false);
   const [mapMode, setMapMode] = useState<"spots" | "logs">("spots");
-  const [selectedLogRestaurantId, setSelectedLogRestaurantId] = useState<string | null>(null);
+  const [selectedLogRestaurantId, setSelectedLogRestaurantId] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
-    if (!highlightRestaurantId || !markers.some((m) => m.id === highlightRestaurantId))
+    if (
+      !highlightRestaurantId ||
+      !markers.some((m) => m.id === highlightRestaurantId)
+    )
       return;
     const id = highlightRestaurantId;
     const marker = markers.find((m) => m.id === id);
@@ -108,7 +115,9 @@ export function MapView({
 
   const handleLogMarkerClick = useCallback(
     (restaurantId: string) => {
-      const marker = visitLogMarkers.find((v) => v.restaurantId === restaurantId);
+      const marker = visitLogMarkers.find(
+        (v) => v.restaurantId === restaurantId,
+      );
       if (marker) {
         setMapCenter({
           lat: marker.restaurant.latitude,
@@ -123,7 +132,9 @@ export function MapView({
   );
 
   const handleCameraChange = useCallback(
-    (ev: { detail: { center?: { lat: number; lng: number }; zoom?: number } }) => {
+    (ev: {
+      detail: { center?: { lat: number; lng: number }; zoom?: number };
+    }) => {
       const { center, zoom } = ev.detail ?? {};
       if (center) setMapCenter(center);
       if (typeof zoom === "number") setMapZoom(zoom);
@@ -154,7 +165,14 @@ export function MapView({
   // Group visit log markers by restaurant
   const groupedLogMarkers = useMemo(() => {
     return visitLogMarkers.reduce<
-      Record<string, { restaurant: VisitLogMarker["restaurant"]; markers: VisitLogMarker[]; latestPhoto?: string }>
+      Record<
+        string,
+        {
+          restaurant: VisitLogMarker["restaurant"];
+          markers: VisitLogMarker[];
+          latestPhoto?: string;
+        }
+      >
     >((acc, v) => {
       if (!acc[v.restaurantId]) {
         acc[v.restaurantId] = {
@@ -205,7 +223,9 @@ export function MapView({
                   aria-expanded={groupMenuOpen}
                 >
                   <span className="min-w-0 flex-1 overflow-hidden text-left">
-                    <span className="line-clamp-1 block">{selectedGroupName}</span>
+                    <span className="line-clamp-1 block">
+                      {selectedGroupName}
+                    </span>
                   </span>
                   <span className="shrink-0 text-[10px] text-muted-foreground">
                     {groupMenuOpen ? "▲" : "▼"}
@@ -240,7 +260,10 @@ export function MapView({
             <div className="flex rounded-full bg-muted/50 p-0.5">
               <button
                 type="button"
-                onClick={() => { setMapMode("spots"); setSelectedLogRestaurantId(null); }}
+                onClick={() => {
+                  setMapMode("spots");
+                  setSelectedLogRestaurantId(null);
+                }}
                 className={`flex-1 rounded-full py-1.5 text-[10px] font-black uppercase tracking-widest transition-all ${
                   mapMode === "spots"
                     ? "bg-primary text-primary-foreground shadow-sm"
@@ -251,7 +274,10 @@ export function MapView({
               </button>
               <button
                 type="button"
-                onClick={() => { setMapMode("logs"); setSelectedRestaurantId(null); }}
+                onClick={() => {
+                  setMapMode("logs");
+                  setSelectedRestaurantId(null);
+                }}
                 className={`flex-1 rounded-full py-1.5 text-[10px] font-black uppercase tracking-widest transition-all ${
                   mapMode === "logs"
                     ? "bg-primary text-primary-foreground shadow-sm"
@@ -399,7 +425,9 @@ function LogsBottomSheet({
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         ) : visits.length === 0 ? (
-          <p className="py-4 text-sm text-muted-foreground">No visits logged here yet.</p>
+          <p className="py-4 text-sm text-muted-foreground">
+            No visits logged here yet.
+          </p>
         ) : (
           <ul className="space-y-4">
             {visits.map((v) => (
@@ -407,7 +435,10 @@ function LogsBottomSheet({
                 <VisitLogCard
                   visit={{
                     ...v,
-                    restaurant: { id: v.restaurant.id, name: v.restaurant.name },
+                    restaurant: {
+                      id: v.restaurant.id,
+                      name: v.restaurant.name,
+                    },
                   }}
                   editable
                 />
