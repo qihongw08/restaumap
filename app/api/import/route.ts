@@ -21,11 +21,15 @@ export async function POST(request: NextRequest) {
     const name =
       (typeof body.name === "string" && body.name.trim()
         ? body.name.trim()
-        : null) ?? extracted.name ?? "Unknown";
+        : null) ??
+      extracted.name ??
+      "Unknown";
     const address =
       (typeof body.address === "string" && body.address.trim()
         ? body.address.trim()
-        : null) ?? extracted.address ?? null;
+        : null) ??
+      extracted.address ??
+      null;
     const rawCaption =
       typeof extracted.rawCaption === "string" ? extracted.rawCaption : null;
     const sourcePlatform =
@@ -55,11 +59,6 @@ export async function POST(request: NextRequest) {
       typeof body.longitude === "number" ? body.longitude : null;
     const googlePlaceId: string | null =
       typeof placeId === "string" && placeId.trim() ? placeId.trim() : null;
-    const photoReferences: string[] = Array.isArray(body.photoReferences)
-      ? (body.photoReferences as unknown[]).filter(
-          (p): p is string => typeof p === "string",
-        )
-      : [];
     const openingHoursWeekdayText: string[] = Array.isArray(
       extracted.openingHoursWeekdayText,
     )
@@ -79,10 +78,6 @@ export async function POST(request: NextRequest) {
           longitude != null &&
           (existing.latitude == null || existing.longitude == null);
 
-        const needsPhotos =
-          photoReferences.length > 0 &&
-          (existing.photoReferences?.length ?? 0) === 0;
-
         const needsOpeningHours =
           openingHoursWeekdayText.length > 0 &&
           (existing.openingHoursWeekdayText?.length ?? 0) === 0;
@@ -94,7 +89,6 @@ export async function POST(request: NextRequest) {
           formattedAddress !== existing.formattedAddress;
 
         const needsUpdate =
-          needsPhotos ||
           needsOpeningHours ||
           needsCoords ||
           needsName ||
@@ -105,7 +99,6 @@ export async function POST(request: NextRequest) {
           await prisma.restaurant.update({
             where: { id: existing.id },
             data: {
-              ...(needsPhotos ? { photoReferences } : {}),
               ...(needsOpeningHours ? { openingHoursWeekdayText } : {}),
               ...(needsCoords && latitude != null && longitude != null
                 ? { latitude, longitude }
@@ -125,7 +118,6 @@ export async function POST(request: NextRequest) {
             latitude,
             longitude,
             googlePlaceId,
-            photoReferences,
             openingHoursWeekdayText,
             cuisineTypes,
             popularDishes,

@@ -121,9 +121,6 @@ export async function POST(request: NextRequest) {
       latitude: body.latitude ?? null,
       longitude: body.longitude ?? null,
       googlePlaceId: body.googlePlaceId ?? null,
-      photoReferences: Array.isArray(body.photoReferences)
-        ? body.photoReferences
-        : [],
       openingHoursWeekdayText: body.openingHoursWeekdayText ?? [],
       cuisineTypes: body.cuisineTypes ?? [],
       popularDishes: body.popularDishes ?? [],
@@ -137,14 +134,25 @@ export async function POST(request: NextRequest) {
         where: { googlePlaceId: body.googlePlaceId },
         create: restaurantData,
         update: {
-          ...(body.formattedAddress ? { formattedAddress: body.formattedAddress } : {}),
+          ...(body.formattedAddress
+            ? { formattedAddress: body.formattedAddress }
+            : {}),
           ...(body.latitude != null ? { latitude: body.latitude } : {}),
           ...(body.longitude != null ? { longitude: body.longitude } : {}),
-          ...(restaurantData.photoReferences.length > 0 ? { photoReferences: restaurantData.photoReferences } : {}),
-          ...(restaurantData.cuisineTypes.length > 0 ? { cuisineTypes: restaurantData.cuisineTypes } : {}),
-          ...(restaurantData.popularDishes.length > 0 ? { popularDishes: restaurantData.popularDishes } : {}),
+          ...(restaurantData.cuisineTypes.length > 0
+            ? { cuisineTypes: restaurantData.cuisineTypes }
+            : {}),
+          ...(restaurantData.popularDishes.length > 0
+            ? { popularDishes: restaurantData.popularDishes }
+            : {}),
           ...(body.priceRange ? { priceRange: body.priceRange } : {}),
-          ...(restaurantData.ambianceTags.length > 0 ? { ambianceTags: restaurantData.ambianceTags } : {}),
+          ...(restaurantData.ambianceTags.length > 0
+            ? { ambianceTags: restaurantData.ambianceTags }
+            : {}),
+          ...(body.openingHoursWeekdayText &&
+          body.openingHoursWeekdayText.length > 0
+            ? { openingHoursWeekdayText: body.openingHoursWeekdayText }
+            : {}),
         },
       });
     } else {

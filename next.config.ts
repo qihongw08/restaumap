@@ -6,7 +6,6 @@ const r2Host = r2PublicUrl ? new URL(r2PublicUrl).hostname : null;
 const nextConfig: NextConfig = {
   images: {
     localPatterns: [
-      { pathname: "/api/places/photo" },
       { pathname: "/icon-main.png" },
     ],
     remotePatterns: [

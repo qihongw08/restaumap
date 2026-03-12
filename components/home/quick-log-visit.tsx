@@ -12,7 +12,6 @@ interface SearchResult {
   address?: string;
   source: "saved" | "google";
   googlePlaceId?: string;
-  photoReferences?: string[];
   latitude?: number | null;
   longitude?: number | null;
 }
@@ -97,7 +96,6 @@ export function QuickLogVisit({
                 placeId: string;
                 name: string;
                 formattedAddress?: string;
-                photoReferences?: string[];
                 latitude?: number | null;
                 longitude?: number | null;
               }) => ({
@@ -105,7 +103,6 @@ export function QuickLogVisit({
                 name: p.name,
                 address: p.formattedAddress,
                 source: "google" as const,
-                photoReferences: p.photoReferences,
                 latitude: p.latitude,
                 longitude: p.longitude,
                 googlePlaceId: p.placeId,
@@ -152,7 +149,7 @@ export function QuickLogVisit({
           googlePlaceId: result.googlePlaceId,
           latitude: result.latitude ?? null,
           longitude: result.longitude ?? null,
-          photoReferences: result.photoReferences ?? [],
+          openingHoursWeekdayText: enriched.openingHoursWeekdayText ?? [],
           cuisineTypes: enriched.cuisineTypes ?? [],
           popularDishes: enriched.popularDishes ?? [],
           priceRange: enriched.priceRange ?? null,

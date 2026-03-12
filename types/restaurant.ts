@@ -11,7 +11,10 @@ export type { RestaurantStatus };
 export type Restaurant = PrismaRestaurant;
 export type { Import };
 
-export type RestaurantWithVisits = Omit<Restaurant, "createdAt" | "updatedAt"> & {
+export type RestaurantWithVisits = Omit<
+  Restaurant,
+  "createdAt" | "updatedAt"
+> & {
   createdAt: Date | string;
   updatedAt: Date | string;
   visits: VisitWithPhotos[];
@@ -24,13 +27,11 @@ export type RestaurantWithDetails = Restaurant & {
   visits: VisitWithPhotos[];
   photos: Photo[];
   imports?: Import[];
-  photoReferences: string[];
   openingHoursWeekdayText?: string[];
   sourceUrl?: string | null;
   sourcePlatform?: string | null;
   rawCaption?: string | null;
   savedAt?: string | Date;
-  /** From UserRestaurant (per-user), merged by API */
   status: RestaurantStatus;
   isBlacklisted?: boolean;
 };

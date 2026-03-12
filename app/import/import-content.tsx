@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { Header } from "@/components/shared/header";
 import { Nav } from "@/components/shared/nav";
@@ -24,8 +23,6 @@ type PlaceCandidate = {
   placeId: string;
   name: string;
   formattedAddress: string;
-  photoReference: string | null;
-  photoReferences?: string[];
   latitude?: number | null;
   longitude?: number | null;
 };
@@ -161,11 +158,6 @@ export function ImportContent({
           payload.latitude = selectedCandidate.latitude;
         if (typeof selectedCandidate.longitude === "number")
           payload.longitude = selectedCandidate.longitude;
-        payload.photoReferences = Array.isArray(
-          selectedCandidate.photoReferences,
-        )
-          ? selectedCandidate.photoReferences
-          : [];
       }
 
       const res = await fetch("/api/import", {
@@ -303,16 +295,6 @@ export function ImportContent({
                                 : "border-muted hover:border-primary/40"
                             }`}
                           >
-                            {c.photoReference && (
-                              <Image
-                                src={`/api/places/photo?reference=${encodeURIComponent(c.photoReference)}`}
-                                alt=""
-                                width={56}
-                                height={56}
-                                unoptimized
-                                className="h-14 w-14 rounded-xl object-cover shrink-0"
-                              />
-                            )}
                             <div className="min-w-0 flex-1">
                               <p className="font-bold text-foreground truncate">
                                 {c.name}

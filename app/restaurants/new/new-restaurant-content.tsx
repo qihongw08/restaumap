@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,8 +9,6 @@ type PlaceCandidate = {
   placeId: string;
   name: string;
   formattedAddress: string;
-  photoReference: string | null;
-  photoReferences?: string[];
   latitude?: number | null;
   longitude?: number | null;
 };
@@ -96,12 +93,9 @@ export function NewRestaurantContent() {
           latitude: selected.latitude ?? null,
           longitude: selected.longitude ?? null,
           googlePlaceId: selected.placeId,
-          photoReferences: Array.isArray(selected.photoReferences)
-            ? selected.photoReferences
-            : selected.photoReference
-              ? [selected.photoReference]
-              : [],
-          openingHoursWeekdayText: Array.isArray(extracted.openingHoursWeekdayText)
+          openingHoursWeekdayText: Array.isArray(
+            extracted.openingHoursWeekdayText,
+          )
             ? extracted.openingHoursWeekdayText
             : [],
           cuisineTypes: Array.isArray(extracted.cuisineTypes)
@@ -176,18 +170,11 @@ export function NewRestaurantContent() {
                         : "border-muted hover:border-primary/40"
                     }`}
                   >
-                    {c.photoReference && (
-                      <Image
-                        src={`/api/places/photo?reference=${encodeURIComponent(c.photoReference)}`}
-                        alt=""
-                        width={56}
-                        height={56}
-                        unoptimized
-                        className="h-14 w-14 rounded-xl object-cover shrink-0"
-                      />
-                    )}
+                    {/* Google photo preview removed */}
                     <div className="min-w-0 flex-1">
-                      <p className="font-bold text-foreground truncate">{c.name}</p>
+                      <p className="font-bold text-foreground truncate">
+                        {c.name}
+                      </p>
                       <p className="text-xs text-muted-foreground truncate">
                         {c.formattedAddress}
                       </p>

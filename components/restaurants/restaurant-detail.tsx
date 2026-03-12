@@ -5,18 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { RestaurantWithDetails } from "@/types/restaurant";
 import { ChevronRight, MapPin, Plus, Clock, DollarSign } from "lucide-react";
-import { calculatePFRatio, cn } from "@/lib/utils";
+import { calculatePFRatio } from "@/lib/utils";
 import { PFRatioDisplay } from "@/components/visits/pf-ratio-display";
 import { LogVisitModal } from "@/components/visits/log-visit-modal";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 
 interface RestaurantDetailProps {
   restaurant: RestaurantWithDetails;
 }
-
-const FALLBACK_IMAGE =
-  "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=800&h=600";
 
 function getGoogleMapsUrl(restaurant: RestaurantWithDetails): string | null {
   const fallbackQuery =
@@ -38,57 +34,13 @@ function getGoogleMapsUrl(restaurant: RestaurantWithDetails): string | null {
 }
 
 export function RestaurantDetail({ restaurant }: RestaurantDetailProps) {
-  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
   const [logVisitOpen, setLogVisitOpen] = useState(false);
   const googleMapsUrl = getGoogleMapsUrl(restaurant);
   const router = useRouter();
 
-  const photoRefs = restaurant.photoReferences ?? [];
-  const mainPhotoRef = photoRefs[selectedPhotoIndex] ?? null;
-  const mainPhotoSrc = mainPhotoRef
-    ? `/api/places/photo?reference=${encodeURIComponent(mainPhotoRef)}`
-    : FALLBACK_IMAGE;
-
   return (
     <div className="relative min-h-screen bg-background pb-32">
-      {/* Premium Image Header + optional gallery */}
-      <div className="relative h-[45vh] w-full overflow-hidden">
-        <Image
-          src={mainPhotoSrc}
-          alt={restaurant.name}
-          width={800}
-          height={450}
-          unoptimized={mainPhotoSrc.startsWith("/api/places/photo")}
-          className="h-full w-full object-cover"
-        />
-        {photoRefs.length > 1 && (
-          <div className="absolute bottom-20 left-0 right-0 flex justify-center gap-2 px-4">
-            {photoRefs.map((ref: string, i: number) => (
-              <button
-                key={ref}
-                type="button"
-                onClick={() => setSelectedPhotoIndex(i)}
-                className={cn(
-                  "h-12 w-12 shrink-0 overflow-hidden rounded-xl border-2 transition-all",
-                  selectedPhotoIndex === i
-                    ? "border-primary ring-2 ring-primary/50"
-                    : "border-white/40 opacity-80 hover:opacity-100",
-                )}
-              >
-                <Image
-                  src={`/api/places/photo?reference=${encodeURIComponent(ref)}`}
-                  alt=""
-                  width={48}
-                  height={48}
-                  unoptimized
-                  className="h-full w-full object-cover"
-                />
-              </button>
-            ))}
-          </div>
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-
+      <div className="relative h-[45vh] w-full overflow-hidden bg-gradient-to-t from-black/80 via-black/20 to-transparent">
         <div className="absolute top-12 left-6 right-6 flex items-center justify-between">
           <button
             type="button"

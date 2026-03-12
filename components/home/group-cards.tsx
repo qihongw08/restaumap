@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Plus, Users } from "lucide-react";
+import { Plus } from "lucide-react";
 
 interface GroupCardData {
   id: string;
@@ -32,7 +32,8 @@ export function GroupCards({ groups }: GroupCardsProps) {
                 {g.name}
               </p>
               <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                {g.memberCount} member{g.memberCount !== 1 ? "s" : ""} · {g.restaurantCount} spot{g.restaurantCount !== 1 ? "s" : ""}
+                {g.memberCount} member{g.memberCount !== 1 ? "s" : ""} ·{" "}
+                {g.restaurantCount} spot{g.restaurantCount !== 1 ? "s" : ""}
               </p>
             </div>
             <div className="mt-3 flex">
@@ -65,7 +66,9 @@ export function GroupCards({ groups }: GroupCardsProps) {
           className="flex shrink-0 w-48 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-muted bg-muted/10 p-4 text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
         >
           <Plus className="h-6 w-6" />
-          <span className="text-xs font-black uppercase tracking-widest">New Group</span>
+          <span className="text-xs font-black uppercase tracking-widest">
+            New Group
+          </span>
         </Link>
       </div>
     </section>

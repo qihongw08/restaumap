@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import type { RestaurantWithDetails } from "@/types/restaurant";
 import { useLocation } from "@/hooks/use-location";
-import Image from "next/image";
 
 interface NearbyBottomSheetProps {
   restaurants: RestaurantWithDetails[];
@@ -32,15 +31,72 @@ interface NearbyBottomSheetProps {
 }
 
 const PRICE_RANGES = ["$", "$$", "$$$", "$$$$"] as const;
-const FALLBACK_IMAGE =
-  "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=400&h=250";
 
-// Google weekday_text is Monday=0 .. Sunday=6; JS getDay() is Sunday=0 .. Saturday=6
 function getTodaysHours(weekdayText: string[] | undefined): string | null {
   if (!weekdayText?.length) return null;
+
+  const fullNames = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+  const abbrevs = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const jsDay = new Date().getDay();
-  const index = (jsDay + 6) % 7;
-  return weekdayText[index] ?? null;
+
+  const todayFull = fullNames[jsDay];
+  const todayAbbrev = abbrevs[jsDay];
+
+  const normalize = (s: string) => s.trim().replace(/\.$/, "");
+
+  for (const line of weekdayText) {
+    const [dayPartRaw] = line.split(":");
+    if (!dayPartRaw) continue;
+    const dayPart = dayPartRaw.trim();
+
+    if (
+      dayPart.toLowerCase() === todayFull.toLowerCase() ||
+      dayPart.toLowerCase() === todayAbbrev.toLowerCase()
+    ) {
+      return line;
+    }
+
+    const tokens = dayPart.split(/[,，]/).map((t) => normalize(t));
+    for (const token of tokens) {
+      if (!token) continue;
+      const rangeMatch = token.split(/[-–]/).map((t) => normalize(t));
+      if (rangeMatch.length === 2) {
+        const start = rangeMatch[0];
+        const end = rangeMatch[1];
+        const startIdx = abbrevs.findIndex(
+          (a, i) =>
+            a.toLowerCase() === start.toLowerCase() ||
+            fullNames[i].toLowerCase() === start.toLowerCase(),
+        );
+        const endIdx = abbrevs.findIndex(
+          (a, i) =>
+            a.toLowerCase() === end.toLowerCase() ||
+            fullNames[i].toLowerCase() === end.toLowerCase(),
+        );
+        if (startIdx === -1 || endIdx === -1) continue;
+        if (jsDay >= startIdx && jsDay <= endIdx) {
+          return line;
+        }
+      } else {
+        if (
+          token.toLowerCase() === todayAbbrev.toLowerCase() ||
+          token.toLowerCase() === todayFull.toLowerCase()
+        ) {
+          return line;
+        }
+      }
+    }
+  }
+
+  return null;
 }
 
 function getOpenUntil(weekdayText: string[] | undefined): string | null {
@@ -86,7 +142,6 @@ export function NearbyBottomSheet({
   isOpen: controlledOpen,
   onOpenChange,
   onRestaurantClick,
-  showPhotos = true,
   controlledCategory,
   onCategoryChange,
   controlledPriceRange,
@@ -113,10 +168,6 @@ export function NearbyBottomSheet({
       : internalPriceRange;
   const setPriceRangeFilter = onPriceRangeChange ?? setInternalPriceRange;
   const [onlyOpen, setOnlyOpen] = useState(false);
-  const [openStatusByPlaceId, setOpenStatusByPlaceId] = useState<
-    Record<string, boolean>
-  >({});
-  const [loadingOpenStatus, setLoadingOpenStatus] = useState(false);
 
   const { coords, getLocation } = useLocation();
 
@@ -175,47 +226,13 @@ export function NearbyBottomSheet({
     return withDetails;
   }, [restaurants, activeCategory, priceRangeFilter, coords]);
 
-  const placeIdsToFetch = useMemo(
-    () => baseFiltered.map((r) => r.googlePlaceId).filter(Boolean) as string[],
-    [baseFiltered],
-  );
-  const placeIdsKey = placeIdsToFetch.join(",");
-
-  useEffect(() => {
-    if (!onlyOpen || placeIdsToFetch.length === 0) {
-      const t = setTimeout(() => setLoadingOpenStatus(false), 0);
-      return () => clearTimeout(t);
-    }
-    let cancelled = false;
-    const loadingTimer = setTimeout(() => {
-      if (!cancelled) setLoadingOpenStatus(true);
-    }, 0);
-    fetch(`/api/places/opening-status?placeIds=${placeIdsKey}`)
-      .then((res) => res.json())
-      .then((json: { data: Record<string, { openNow: boolean }> }) => {
-        if (cancelled) return;
-        const next: Record<string, boolean> = {};
-        for (const [placeId, val] of Object.entries(json.data ?? {})) {
-          next[placeId] = val.openNow;
-        }
-        setOpenStatusByPlaceId(next);
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingOpenStatus(false);
-      });
-    return () => {
-      cancelled = true;
-      clearTimeout(loadingTimer);
-    };
-  }, [onlyOpen, placeIdsKey, placeIdsToFetch.length]);
-
   const filteredRestaurants = useMemo(() => {
     if (!onlyOpen) return baseFiltered;
-    if (loadingOpenStatus) return [];
-    return baseFiltered.filter(
-      (r) => r.googlePlaceId && openStatusByPlaceId[r.googlePlaceId!],
-    );
-  }, [baseFiltered, onlyOpen, loadingOpenStatus, openStatusByPlaceId]);
+    return baseFiltered.filter((r) => {
+      const status = getOpenUntil(r.openingHoursWeekdayText);
+      return status && status !== "Closed";
+    });
+  }, [baseFiltered, onlyOpen]);
 
   return (
     <div
@@ -336,29 +353,7 @@ export function NearbyBottomSheet({
                       : "border-primary/5 hover:border-primary/40 hover:bg-muted/80",
                   )}
                 >
-                  <div
-                    className={cn(
-                      "grid min-w-0 items-start",
-                      showPhotos ? "grid-cols-[6rem_1fr] gap-5" : "grid-cols-1",
-                    )}
-                  >
-                    {showPhotos && (
-                      <div className="h-24 w-24 rounded-3xl bg-muted overflow-hidden shrink-0 border-2 border-primary/10 group-hover:border-primary shadow-lg ring-4 ring-primary/5">
-                        <Image
-                          src={
-                            res.photoReferences?.[0]
-                              ? `/api/places/photo?reference=${encodeURIComponent(res.photoReferences[0])}`
-                              : FALLBACK_IMAGE
-                          }
-                          alt={res.name}
-                          width={96}
-                          height={96}
-                          unoptimized={!!res.photoReferences?.[0]}
-                          className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700"
-                        />
-                      </div>
-                    )}
-
+                  <div className="grid min-w-0 items-start grid-cols-1">
                     <div className="min-w-0 flex flex-col gap-1.5 overflow-hidden">
                       <div className="flex min-w-0 items-start justify-between gap-2">
                         <h4 className="min-w-0 flex-1 text-md font-black italic tracking-tighter text-foreground uppercase group-hover:text-primary transition-colors overflow-hidden">
@@ -432,24 +427,14 @@ export function NearbyBottomSheet({
               </div>
             ))}
 
-            {onlyOpen && loadingOpenStatus && (
-              <div className="flex flex-col items-center justify-center py-20 gap-4">
-                <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">
-                  Checking opening hours…
+            {filteredRestaurants.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-20 opacity-30 gap-4">
+                <Search className="h-12 w-12 text-primary" />
+                <p className="text-xs font-black uppercase tracking-widest">
+                  {onlyOpen ? "No open places right now" : "No matching places"}
                 </p>
               </div>
             )}
-            {filteredRestaurants.length === 0 &&
-              !(onlyOpen && loadingOpenStatus) && (
-                <div className="flex flex-col items-center justify-center py-20 opacity-30 gap-4">
-                  <Search className="h-12 w-12 text-primary" />
-                  <p className="text-xs font-black uppercase tracking-widest">
-                    {onlyOpen
-                      ? "No open places right now"
-                      : "No matching places"}
-                  </p>
-                </div>
-              )}
           </div>
         </div>
       </div>

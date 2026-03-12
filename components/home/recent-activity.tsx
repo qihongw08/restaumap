@@ -29,7 +29,6 @@ interface AddedItem {
   restaurantName: string;
   address?: string;
   savedAt: string;
-  photoReference?: string;
 }
 
 interface RecentActivityProps {

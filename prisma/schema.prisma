@@ -27,7 +27,6 @@ model Restaurant {
 
   // Google Places (enriched from import)
   googlePlaceId           String?  @unique @map("google_place_id")
-  photoReferences         String[] @default([]) @map("photo_references") // Up to 5 photo references from Place Details; use with /api/places/photo
   openingHoursWeekdayText String[] @default([]) @map("opening_hours_weekday_text") // From Place Details opening_hours.weekday_text
 
   // Extracted data

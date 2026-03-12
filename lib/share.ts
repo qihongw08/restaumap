@@ -1,5 +1,9 @@
 import { randomBytes } from "node:crypto";
-import type { ShareLink, ShareLinkType, RestaurantStatus } from "@prisma/client";
+import type {
+  ShareLink,
+  ShareLinkType,
+  RestaurantStatus,
+} from "@prisma/client";
 import type { RestaurantWithDetails } from "@/types/restaurant";
 import { prisma } from "@/lib/prisma";
 
@@ -33,7 +37,6 @@ function mapToSharedRestaurant(
     latitude: number | null;
     longitude: number | null;
     googlePlaceId: string | null;
-    photoReferences: string[];
     openingHoursWeekdayText: string[];
     cuisineTypes: string[];
     popularDishes: string[];

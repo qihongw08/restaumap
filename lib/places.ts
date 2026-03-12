@@ -18,8 +18,6 @@ export interface PlaceCandidate {
   placeId: string;
   name: string;
   formattedAddress: string;
-  photoReference: string | null;
-  photoReferences: string[];
   latitude: number | null;
   longitude: number | null;
 }
@@ -31,14 +29,14 @@ export interface PlaceCandidate {
 export async function searchPlaces(query: string): Promise<PlaceCandidate[]> {
   const key = getKey();
   const endpoint = "https://places.googleapis.com/v1/places:searchText";
-  
+
   const res = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-Goog-Api-Key": key,
       "X-Goog-FieldMask":
-        "places.id,places.displayName,places.formattedAddress,places.location,places.photos",
+        "places.id,places.displayName,places.formattedAddress,places.location",
     },
     body: JSON.stringify({ textQuery: query }),
   });
@@ -66,28 +64,14 @@ export async function searchPlaces(query: string): Promise<PlaceCandidate[]> {
   };
 
   const places = data.places ?? [];
-  return places.slice(0, 5).map((p) => {
-    const photoRefs =
-      p.photos?.slice(0, MAX_PLACE_PHOTOS).map((photo) => {
-        const name = photo.name;
-        if (name.startsWith("places/")) {
-          return name;
-        }
-        return `places/${p.id}/photos/${name}`;
-      }) ?? [];
-    return {
-      placeId: p.id,
-      name: p.displayName?.text ?? "",
-      formattedAddress: p.formattedAddress ?? "",
-      photoReference: photoRefs[0] ?? null,
-      photoReferences: photoRefs,
-      latitude: p.location?.latitude ?? null,
-      longitude: p.location?.longitude ?? null,
-    };
-  });
+  return places.slice(0, 5).map((p) => ({
+    placeId: p.id,
+    name: p.displayName?.text ?? "",
+    formattedAddress: p.formattedAddress ?? "",
+    latitude: p.location?.latitude ?? null,
+    longitude: p.location?.longitude ?? null,
+  }));
 }
-
-const MAX_PLACE_PHOTOS = 5;
 
 export interface PlaceDetailsResult {
   placeId: string;
@@ -95,19 +79,12 @@ export interface PlaceDetailsResult {
   formattedAddress: string | null;
   latitude: number | null;
   longitude: number | null;
-  photoReference: string | null;
-  photoReferences: string[]; // Up to 5 photo references (use with /api/places/photo)
   openingHoursWeekdayText: string[]; // e.g. ["Monday: 9:00 AM – 5:00 PM", ...]
-}
-
-export interface PlaceOpeningHoursResult {
-  openNow: boolean;
-  weekdayText: string[];
 }
 
 /**
  * Get place details by place ID (Places API v1).
- * Returns name, address, lat/lng, up to 5 photo references, and weekday opening hours.
+ * Returns name, address, lat/lng, and weekday opening hours.
  */
 export async function getPlaceDetails(
   placeId: string,
@@ -122,7 +99,7 @@ export async function getPlaceDetails(
     headers: {
       "X-Goog-Api-Key": key,
       "X-Goog-FieldMask":
-        "id,displayName,formattedAddress,location,photos,regularOpeningHours.weekdayDescriptions",
+        "id,displayName,formattedAddress,location,regularOpeningHours.weekdayDescriptions",
     },
   });
 
@@ -131,7 +108,6 @@ export async function getPlaceDetails(
     displayName?: { text?: string };
     formattedAddress?: string;
     location?: { latitude?: number; longitude?: number };
-    photos?: Array<{ name: string }>;
     regularOpeningHours?: { weekdayDescriptions?: string[] };
   };
 
@@ -144,8 +120,6 @@ export async function getPlaceDetails(
     );
   }
 
-  const refs = data.photos?.slice(0, MAX_PLACE_PHOTOS).map((p) => p.name) ?? [];
-  const photoRef = refs[0] ?? null;
   const openingHoursWeekdayText =
     data.regularOpeningHours?.weekdayDescriptions ?? [];
 
@@ -155,62 +129,6 @@ export async function getPlaceDetails(
     formattedAddress: data.formattedAddress ?? null,
     latitude: data.location?.latitude ?? null,
     longitude: data.location?.longitude ?? null,
-    photoReference: photoRef,
-    photoReferences: refs,
     openingHoursWeekdayText,
   };
-}
-
-/**
- * Fetch only opening hours for a place (for \"Open Now\" filter).
- * Uses Places API v1 details with a minimal field mask.
- */
-export async function getPlaceOpeningHours(
-  placeId: string,
-): Promise<PlaceOpeningHoursResult> {
-  const key = getKey();
-  const endpoint = `https://places.googleapis.com/v1/places/${encodeURIComponent(
-    placeId,
-  )}`;
-
-  const res = await fetch(endpoint, {
-    method: "GET",
-    headers: {
-      "X-Goog-Api-Key": key,
-      "X-Goog-FieldMask":
-        "currentOpeningHours.openNow,currentOpeningHours.weekdayDescriptions",
-    },
-  });
-
-  const data = (await res.json()) as {
-    currentOpeningHours?: {
-      openNow?: boolean;
-      weekdayDescriptions?: string[];
-    };
-  };
-
-  if (!res.ok || !data.currentOpeningHours) {
-    return { openNow: false, weekdayText: [] };
-  }
-
-  const oh = data.currentOpeningHours;
-  return {
-    openNow: oh?.openNow ?? false,
-    weekdayText: oh?.weekdayDescriptions ?? [],
-  };
-}
-
-/**
- * Build a photo URL for a stored photo reference.
- * Supports both:
- * - Places API v1 photo name (e.g. "places/ID/photos/PHOTO") -> uses v1 media endpoint
- * - Legacy photo_reference string -> uses legacy photo endpoint
- * This returns the media render URL; typically used via an API route proxy.
- */
-export function buildPlacePhotoUrl(photoReference: string): string {
-  const key = getKey();
-  if (photoReference.startsWith("places/")) {
-    return `https://places.googleapis.com/v1/${photoReference}/media?maxWidthPx=800&key=${key}`;
-  }
-  return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${encodeURIComponent(photoReference)}&key=${key}`;
 }
