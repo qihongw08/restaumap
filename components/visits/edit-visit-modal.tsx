@@ -97,19 +97,31 @@ export function EditVisitModal({
 
       let newPhotoUrls: string[] = [];
       if (newPhotoFiles.length > 0) {
-        const formData = new FormData();
-        formData.append("restaurantId", restaurantId);
-        newPhotoFiles.forEach((f) => formData.append("files", f));
-        const uploadRes = await fetch("/api/upload", {
+        const presignRes = await fetch("/api/upload/presign", {
           method: "POST",
-          body: formData,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            restaurantId,
+            files: newPhotoFiles.map((f) => ({ name: f.name, type: f.type, size: f.size })),
+          }),
         });
-        if (!uploadRes.ok) {
-          const data = await uploadRes.json().catch(() => ({}));
-          throw new Error(data.error ?? "Photo upload failed");
+        if (!presignRes.ok) {
+          const data = await presignRes.json().catch(() => ({}));
+          throw new Error(data.error ?? "Failed to get upload URL");
         }
-        const uploadJson = await uploadRes.json();
-        newPhotoUrls = uploadJson.urls ?? [];
+        const { uploads } = await presignRes.json();
+        await Promise.all(
+          newPhotoFiles.map((file, i) =>
+            fetch(uploads[i].uploadUrl, {
+              method: "PUT",
+              headers: { "Content-Type": file.type },
+              body: file,
+            }).then((r) => {
+              if (!r.ok) throw new Error("Photo upload failed");
+            }),
+          ),
+        );
+        newPhotoUrls = uploads.map((u: { publicUrl: string }) => u.publicUrl);
       }
 
       if (newPhotoUrls.length > 0) {

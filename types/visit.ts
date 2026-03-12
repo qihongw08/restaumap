@@ -2,7 +2,12 @@ import type { Visit as PrismaVisit, Photo } from '@prisma/client';
 
 export type Visit = PrismaVisit;
 
-export type VisitWithPhotos = Visit & { photos?: Pick<Photo, 'id' | 'url'>[] };
+export type VisitWithPhotos = Omit<Visit, "visitDate" | "createdAt" | "updatedAt"> & {
+  visitDate: Date | string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  photos?: (Omit<Pick<Photo, "id" | "url" | "uploadedAt">, "uploadedAt"> & { uploadedAt: Date | string })[];
+};
 
 export interface VisitFormData {
   restaurantId: string;

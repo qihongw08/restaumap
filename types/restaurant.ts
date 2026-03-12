@@ -11,7 +11,9 @@ export type { RestaurantStatus };
 export type Restaurant = PrismaRestaurant;
 export type { Import };
 
-export type RestaurantWithVisits = Restaurant & {
+export type RestaurantWithVisits = Omit<Restaurant, "createdAt" | "updatedAt"> & {
+  createdAt: Date | string;
+  updatedAt: Date | string;
   visits: VisitWithPhotos[];
   status: RestaurantStatus;
   isBlacklisted?: boolean;
