@@ -350,6 +350,9 @@ function SWRBottomSheet({
 }) {
   const [category, setCategory] = useState("All");
   const [priceRange, setPriceRange] = useState<string | null>(null);
+  const [restaurants, setRestaurants] = useState<RestaurantWithDetails[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   // Fetch available cuisines once
   const { data: cuisinesData } = useSWR<{ data: string[] }>(
@@ -358,30 +361,100 @@ function SWRBottomSheet({
   );
   const cuisines = cuisinesData?.data ?? [];
 
-  // Build API URL with filters — SWR refetches when key changes
-  const apiUrl = useMemo(() => {
-    const params = new URLSearchParams({ limit: "10" });
-    if (category !== "All") params.set("cuisine", category);
-    if (priceRange) params.set("priceRange", priceRange);
-    return `/api/restaurants?${params}`;
-  }, [category, priceRange]);
+  const buildUrl = useCallback(
+    (nextCursor?: string | null) => {
+      const params = new URLSearchParams({ limit: "20" });
+      if (category !== "All") params.set("cuisine", category);
+      if (priceRange) params.set("priceRange", priceRange);
+      if (nextCursor) params.set("cursor", nextCursor);
+      return `/api/restaurants?${params.toString()}`;
+    },
+    [category, priceRange],
+  );
 
-  const { data } = useSWR<{ data: RestaurantWithDetails[] }>(apiUrl, fetcher);
-  const restaurants = (data?.data ?? []) as RestaurantWithDetails[];
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(buildUrl());
+        if (!res.ok) return;
+        const json = (await res.json()) as {
+          data?: RestaurantWithDetails[];
+          nextCursor?: string | null;
+        };
+        if (cancelled) return;
+        setRestaurants(json.data ?? []);
+        setCursor(json.nextCursor ?? null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [buildUrl, isOpen]);
+
+  const loadMore = useCallback(async () => {
+    if (!cursor || loading) return;
+    setLoading(true);
+    try {
+      const res = await fetch(buildUrl(cursor));
+      if (!res.ok) return;
+      const json = (await res.json()) as {
+        data?: RestaurantWithDetails[];
+        nextCursor?: string | null;
+      };
+      setRestaurants((prev) => [...prev, ...(json.data ?? [])]);
+      setCursor(json.nextCursor ?? null);
+    } finally {
+      setLoading(false);
+    }
+  }, [cursor, loading, buildUrl]);
+
+  // If a marker is selected whose restaurant isn't in the current page yet,
+  // automatically load more pages until it's either found or there is no cursor.
+  useEffect(() => {
+    if (
+      !isOpen ||
+      !highlightedRestaurantId ||
+      !cursor ||
+      loading ||
+      restaurants.some((r) => r.id === highlightedRestaurantId)
+    ) {
+      return;
+    }
+    void loadMore();
+  }, [isOpen, highlightedRestaurantId, cursor, loading, restaurants, loadMore]);
 
   return (
-    <NearbyBottomSheet
-      restaurants={restaurants}
-      highlightedRestaurantId={highlightedRestaurantId}
-      isOpen={isOpen}
-      onOpenChange={onOpenChange}
-      onRestaurantClick={onRestaurantClick}
-      controlledCategory={category}
-      onCategoryChange={setCategory}
-      controlledPriceRange={priceRange}
-      onPriceRangeChange={setPriceRange}
-      cuisines={cuisines}
-    />
+    <>
+      <NearbyBottomSheet
+        restaurants={restaurants}
+        highlightedRestaurantId={highlightedRestaurantId}
+        isOpen={isOpen}
+        onOpenChange={onOpenChange}
+        onRestaurantClick={onRestaurantClick}
+        controlledCategory={category}
+        onCategoryChange={setCategory}
+        controlledPriceRange={priceRange}
+        onPriceRangeChange={setPriceRange}
+        cuisines={cuisines}
+      />
+      {isOpen && cursor && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-36 z-[65] flex justify-center">
+          <button
+            type="button"
+            onClick={loadMore}
+            disabled={loading}
+            className="pointer-events-auto rounded-full bg-background/95 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground shadow-md border border-border disabled:opacity-50"
+          >
+            {loading ? "Loading…" : "Load more places"}
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 
