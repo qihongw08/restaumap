@@ -17,6 +17,13 @@ const SELECTED_ZOOM = 15;
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
+type Bounds = {
+  south: number;
+  west: number;
+  north: number;
+  east: number;
+};
+
 interface MapViewProps {
   markers?: MarkerData[];
   visitLogMarkers?: VisitLogMarker[];
@@ -68,6 +75,7 @@ export function MapView({
   const [selectedLogRestaurantId, setSelectedLogRestaurantId] = useState<
     string | null
   >(null);
+  const [bounds, setBounds] = useState<Bounds | null>(null);
 
   useEffect(() => {
     if (
@@ -133,11 +141,16 @@ export function MapView({
 
   const handleCameraChange = useCallback(
     (ev: {
-      detail: { center?: { lat: number; lng: number }; zoom?: number };
+      detail: {
+        center?: { lat: number; lng: number };
+        zoom?: number;
+        bounds?: Bounds;
+      };
     }) => {
-      const { center, zoom } = ev.detail ?? {};
+      const { center, zoom, bounds: b } = ev.detail ?? {};
       if (center) setMapCenter(center);
       if (typeof zoom === "number") setMapZoom(zoom);
+      if (b) setBounds(b);
     },
     [],
   );
@@ -323,6 +336,7 @@ export function MapView({
             isOpen={sheetOpen}
             onOpenChange={handleSheetOpenChange}
             onRestaurantClick={handleMarkerClick}
+            bounds={bounds}
           />
         )
       ) : (
@@ -342,17 +356,17 @@ function SWRBottomSheet({
   isOpen,
   onOpenChange,
   onRestaurantClick,
+  bounds,
 }: {
   highlightedRestaurantId: string | null;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onRestaurantClick: (id: string) => void;
+  bounds: Bounds | null;
 }) {
   const [category, setCategory] = useState("All");
   const [priceRange, setPriceRange] = useState<string | null>(null);
   const [restaurants, setRestaurants] = useState<RestaurantWithDetails[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
   // Fetch available cuisines once
   const { data: cuisinesData } = useSWR<{ data: string[] }>(
@@ -361,34 +375,38 @@ function SWRBottomSheet({
   );
   const cuisines = cuisinesData?.data ?? [];
 
+  const [appliedBounds, setAppliedBounds] = useState<Bounds | null>(null);
+
   const buildUrl = useCallback(
-    (nextCursor?: string | null) => {
+    () => {
       const params = new URLSearchParams({ limit: "20" });
       if (category !== "All") params.set("cuisine", category);
       if (priceRange) params.set("priceRange", priceRange);
-      if (nextCursor) params.set("cursor", nextCursor);
+      if (appliedBounds) {
+        params.set("minLat", appliedBounds.south.toString());
+        params.set("maxLat", appliedBounds.north.toString());
+        params.set("minLng", appliedBounds.west.toString());
+        params.set("maxLng", appliedBounds.east.toString());
+      }
       return `/api/restaurants?${params.toString()}`;
     },
-    [category, priceRange],
+    [category, priceRange, appliedBounds],
   );
 
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
     (async () => {
-      setLoading(true);
       try {
         const res = await fetch(buildUrl());
         if (!res.ok) return;
         const json = (await res.json()) as {
           data?: RestaurantWithDetails[];
-          nextCursor?: string | null;
         };
         if (cancelled) return;
         setRestaurants(json.data ?? []);
-        setCursor(json.nextCursor ?? null);
       } finally {
-        if (!cancelled) setLoading(false);
+        // no-op: loading state removed with pagination
       }
     })();
     return () => {
@@ -396,37 +414,14 @@ function SWRBottomSheet({
     };
   }, [buildUrl, isOpen]);
 
-  const loadMore = useCallback(async () => {
-    if (!cursor || loading) return;
-    setLoading(true);
-    try {
-      const res = await fetch(buildUrl(cursor));
-      if (!res.ok) return;
-      const json = (await res.json()) as {
-        data?: RestaurantWithDetails[];
-        nextCursor?: string | null;
-      };
-      setRestaurants((prev) => [...prev, ...(json.data ?? [])]);
-      setCursor(json.nextCursor ?? null);
-    } finally {
-      setLoading(false);
-    }
-  }, [cursor, loading, buildUrl]);
-
-  // If a marker is selected whose restaurant isn't in the current page yet,
-  // automatically load more pages until it's either found or there is no cursor.
-  useEffect(() => {
-    if (
-      !isOpen ||
-      !highlightedRestaurantId ||
-      !cursor ||
-      loading ||
-      restaurants.some((r) => r.id === highlightedRestaurantId)
-    ) {
-      return;
-    }
-    void loadMore();
-  }, [isOpen, highlightedRestaurantId, cursor, loading, restaurants, loadMore]);
+  const canSearchHere =
+    isOpen &&
+    bounds &&
+    (!appliedBounds ||
+      bounds.south !== appliedBounds.south ||
+      bounds.north !== appliedBounds.north ||
+      bounds.west !== appliedBounds.west ||
+      bounds.east !== appliedBounds.east);
 
   return (
     <>
@@ -442,15 +437,14 @@ function SWRBottomSheet({
         onPriceRangeChange={setPriceRange}
         cuisines={cuisines}
       />
-      {isOpen && cursor && (
+      {isOpen && canSearchHere && (
         <div className="pointer-events-none absolute inset-x-0 bottom-36 z-[65] flex justify-center">
           <button
             type="button"
-            onClick={loadMore}
-            disabled={loading}
-            className="pointer-events-auto rounded-full bg-background/95 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground shadow-md border border-border disabled:opacity-50"
+            onClick={() => setAppliedBounds(bounds)}
+            className="pointer-events-auto rounded-full bg-background/95 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground shadow-md border border-border"
           >
-            {loading ? "Loading…" : "Load more places"}
+            Search this area
           </button>
         </div>
       )}

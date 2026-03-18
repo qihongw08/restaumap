@@ -18,6 +18,19 @@ export async function GET(request: NextRequest) {
     const cuisine = searchParams.get("cuisine");
     const priceRange = searchParams.get("priceRange");
     const groupId = searchParams.get("groupId");
+    const minLat = searchParams.get("minLat");
+    const maxLat = searchParams.get("maxLat");
+    const minLng = searchParams.get("minLng");
+    const maxLng = searchParams.get("maxLng");
+    const hasBounds =
+      minLat !== null &&
+      maxLat !== null &&
+      minLng !== null &&
+      maxLng !== null &&
+      !Number.isNaN(Number(minLat)) &&
+      !Number.isNaN(Number(maxLat)) &&
+      !Number.isNaN(Number(minLng)) &&
+      !Number.isNaN(Number(maxLng));
     const limit = Math.min(Math.max(Number(limitParam) || 10, 1), 50);
 
     // For cuisine filtering, first get matching restaurant IDs via raw SQL
@@ -39,38 +52,60 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const userRestaurants = await prisma.userRestaurant.findMany({
-      where: {
-        userId: user.id,
-        ...(status ? { status: status as RestaurantStatus } : {}),
-        ...(excludeBlacklisted ? { isBlacklisted: false } : {}),
-        ...(cuisineRestaurantIds || priceRange || groupId
-          ? {
-              restaurant: {
-                ...(cuisineRestaurantIds
-                  ? { id: { in: cuisineRestaurantIds } }
-                  : {}),
-                ...(priceRange ? { priceRange } : {}),
-                ...(groupId ? { groupRestaurants: { some: { groupId } } } : {}),
-              },
-            }
-          : {}),
-      },
-      take: limit + 1,
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-      orderBy: { savedAt: "desc" },
-      include: {
-        restaurant: {
-          include: {
-            visits: {
-              where: { userId: user.id },
-              orderBy: { visitDate: "desc" },
-              take: 5,
-              include: { photos: true },
+    const where = {
+      userId: user.id,
+      ...(status ? { status: status as RestaurantStatus } : {}),
+      ...(excludeBlacklisted ? { isBlacklisted: false } : {}),
+      ...(cuisineRestaurantIds || priceRange || groupId || hasBounds
+        ? {
+            restaurant: {
+              ...(cuisineRestaurantIds
+                ? { id: { in: cuisineRestaurantIds } }
+                : {}),
+              ...(priceRange ? { priceRange } : {}),
+              ...(groupId ? { groupRestaurants: { some: { groupId } } } : {}),
+              ...(hasBounds
+                ? {
+                    latitude: {
+                      gte: Number(minLat),
+                      lte: Number(maxLat),
+                    },
+                    longitude: {
+                      gte: Number(minLng),
+                      lte: Number(maxLng),
+                    },
+                  }
+                : {}),
             },
+          }
+        : {}),
+    } as const;
+
+    const include = {
+      restaurant: {
+        include: {
+          visits: {
+            where: { userId: user.id },
+            orderBy: { visitDate: "desc" },
+            take: 5,
+            include: { photos: true },
           },
         },
       },
+    } as const;
+
+    const orderBy = { savedAt: "desc" } as const;
+
+    const userRestaurants = await prisma.userRestaurant.findMany({
+      where,
+      include,
+      orderBy,
+      ...(hasBounds
+        ? {}
+        : {
+            take: limit + 1,
+            ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+          }),
     });
 
     userRestaurants.sort((a, b) => {
@@ -79,8 +114,9 @@ export async function GET(request: NextRequest) {
       return aVisited - bVisited;
     });
 
-    const hasMore = userRestaurants.length > limit;
-    const items = hasMore ? userRestaurants.slice(0, limit) : userRestaurants;
+    const hasMore = !hasBounds && userRestaurants.length > limit;
+    const items =
+      hasBounds || !hasMore ? userRestaurants : userRestaurants.slice(0, limit);
 
     const data = items.map((ur) => ({
       ...ur.restaurant,
@@ -93,7 +129,8 @@ export async function GET(request: NextRequest) {
       rawCaption: ur.rawCaption,
     }));
 
-    const nextCursor = hasMore ? items[items.length - 1].id : null;
+    const nextCursor =
+      hasBounds || !hasMore ? null : items[items.length - 1].id;
 
     return NextResponse.json({ data, nextCursor });
   } catch (error) {
