@@ -31,9 +31,10 @@ A vibecoded app for big backs like me to stop losing that one restaurant from In
 
 ## 🚀 Tech Stack
 
-- **Framework:** Next.js 14+ (App Router, TypeScript)
+- **Framework:** Next.js 14+ (App Router, Server Actions, TypeScript)
 - **Database:** Supabase (PostgreSQL)
 - **ORM:** Prisma
+- **Validation & Actions:** zod, next-safe-action
 - **AI:** Groq API (Free LLM)
 - **Maps:** Google Maps JavaScript API
 - **Styling:** Tailwind CSS
@@ -89,42 +90,39 @@ bun run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## 🔐 Auth (Google OAuth)
+## 🔐 Auth & Server Actions
 
-Sign-in uses Supabase Auth with the **publishable key** and **@supabase/ssr** for cookie-based sessions:
+This app uses **Next.js Server Actions** for all backend communication, providing end-to-end type safety and automated validation.
 
-- **Server:** Use `createClient()` from `@/lib/supabase/server` and **`getClaims()`** (not `getSession()`) to verify the user. Use `getCurrentUser()` from `@/lib/auth` in Server Components or actions.
-- **Client:** Use `createClient()` from `@/lib/supabase/client` for `signInWithOAuth`, etc.
-- **Proxy:** Session refresh runs in `proxy.ts` and validates the JWT via `getClaims()` so cookies stay in sync.
-- **Callback:** `/auth/callback` exchanges the OAuth code for a session and only redirects to **relative paths** (`/` or `/dashboard`) to avoid open redirects.
-
-Add your app redirect URL (e.g. `http://localhost:3000/auth/callback`) in Supabase **Auth → URL Configuration → Redirect URLs**, and add the Supabase callback URL in Google Cloud Console **Credentials → Authorized redirect URIs**.
+- **Authentication:** Supabase Auth with `@supabase/ssr` for cookie-heavy sessions.
+- **Server Actions:** All mutations and data fetching (outside of Initial Page Loads) use actions defined in `app/actions/`.
+- **Validation:** Every action is guarded by `zod` schemas and handled via `next-safe-action`.
+- **Security:** The `authActionClient` centrally verifies user claims via `getClaims()` and `getCurrentUser()` before executing protected logic.
 
 ## 🗂️ Project Structure
 
 ```
 restaumap/
 ├── app/
-│   ├── api/                  # restaurants, groups (CRUD, invites, join), extract-link, geocode, visits, places (photo, opening-status), auth
-│   ├── restaurants/          # List, new, [id] detail
-│   ├── map/                  # Map + bottom sheet (pins, current location, nearby list)
-│   ├── groups/               # List, new, [id] detail, join (invite link)
-│   ├── import/               # Paste link/caption → extract → save
+│   ├── actions/              # Server Actions (restaurants, groups, visits, upload, etc.)
+│   ├── restaurants/          # Page: List, new, [id] detail
+│   ├── map/                  # Page: Map + bottom sheet (pins, nearby list)
+│   ├── groups/               # Page: List, new, [id] detail, join (invite link)
+│   ├── import/               # Page: Paste link/caption → extract → save
+│   ├── profile/              # Page: User profile, visit history
 │   ├── login/
-│   └── auth/                 # callback, auth-code-error
+│   └── auth/                 # OAuth callback & error handlers
 ├── components/
-│   ├── ui/                   # Button, Card, Modal, etc.
-│   ├── shared/               # Header, Nav, Loading
-│   ├── auth/                 # SignInWithGoogle
-│   ├── map/                  # MapView, RestaurantMap, NearbyBottomSheet, LocationButton
-│   ├── restaurants/          # RestaurantCard, RestaurantList, RestaurantDetail, RestaurantForm, BlacklistModal
-│   ├── visits/               # VisitForm, VisitCard, VisitHistory
-│   └── pwa/                  # RegisterSW
-├── lib/                      # prisma, groq, auth, supabase, utils, constants
-├── types/
-├── hooks/                    # use-restaurants, use-location, use-debounce
-├── prisma/
-└── public/
+│   ├── ui/                   # Shared UI primitives (Button, Card, Modal, etc.)
+│   ├── shared/               # Global components (Header, Nav, Loading)
+│   ├── map/                  # MapView, RestaurantMap, BottomSheets
+│   ├── restaurants/          # Search, List, Detail, Forms
+│   ├── visits/               # Visit logging and history
+│   └── share/                # Share link components
+├── lib/                      # Base clients (prisma, groq, safe-action) and utils
+├── hooks/                    # use-location, use-restaurants, etc.
+├── prisma/                   # Schema and migrations
+└── public/                   # PWA icons and manifest
 ```
 
 ## 🧪 Available Scripts

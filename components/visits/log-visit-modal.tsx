@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input";
 import { calculatePFRatio, clampScore, cn } from "@/lib/utils";
 import { PF_RATIO_FULLNESS_MAX, PF_RATIO_TASTE_MAX } from "@/lib/constants";
 import { ImageIcon, Plus, X } from "lucide-react";
+import { presignUploadsAction } from "@/app/actions/upload";
+import { createVisitAction } from "@/app/actions/visits";
+import { getGroupsAction } from "@/app/actions/groups";
 
 interface LogVisitModalProps {
   open: boolean;
@@ -43,9 +46,12 @@ export function LogVisitModal({
 
   useEffect(() => {
     if (!open || !restaurantId) return;
-    fetch(`/api/restaurants/${restaurantId}/groups`)
-      .then((res) => (res.ok ? res.json() : { data: [] }))
-      .then((json) => setGroups(json.data ?? []))
+    getGroupsAction()
+      .then((res) => {
+        if (res?.data) {
+          setGroups(res.data.map(g => ({ id: g.id, name: g.name })));
+        }
+      })
       .catch(() => setGroups([]));
   }, [open, restaurantId]);
 
@@ -86,20 +92,15 @@ export function LogVisitModal({
     try {
       let photoUrls: string[] = [];
       if (photoFiles.length > 0) {
-        const presignRes = await fetch("/api/upload/presign", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            restaurantId,
-            groupId: selectedGroupId || undefined,
-            files: photoFiles.map((f) => ({ name: f.name, type: f.type, size: f.size })),
-          }),
+        const presignRes = await presignUploadsAction({
+          restaurantId,
+          groupId: selectedGroupId || null,
+          files: photoFiles.map((f) => ({ name: f.name, type: f.type, size: f.size })),
         });
-        if (!presignRes.ok) {
-          const data = await presignRes.json().catch(() => ({}));
-          throw new Error(data.error ?? "Failed to get upload URL");
+        if (presignRes?.serverError || presignRes?.validationErrors || !presignRes?.data) {
+          throw new Error(presignRes?.serverError || "Failed to get upload URL");
         }
-        const { uploads } = await presignRes.json();
+        const uploads = presignRes.data.uploads;
         await Promise.all(
           photoFiles.map((file, i) =>
             fetch(uploads[i].uploadUrl, {
@@ -113,23 +114,18 @@ export function LogVisitModal({
         );
         photoUrls = uploads.map((u: { publicUrl: string }) => u.publicUrl);
       }
-      const res = await fetch("/api/visits", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          restaurantId,
-          visitDate,
-          fullnessScore: clampScore(fullnessScore, 1, PF_RATIO_FULLNESS_MAX),
-          tasteScore: clampScore(tasteScore, 1, PF_RATIO_TASTE_MAX),
-          pricePaid: priceNum,
-          notes: notes || undefined,
-          groupId: selectedGroupId,
-          photoUrls: photoUrls.length > 0 ? photoUrls : undefined,
-        }),
+      const res = await createVisitAction({
+        restaurantId,
+        visitDate,
+        fullnessScore: clampScore(fullnessScore, 1, PF_RATIO_FULLNESS_MAX),
+        tasteScore: clampScore(tasteScore, 1, PF_RATIO_TASTE_MAX),
+        pricePaid: priceNum,
+        notes: notes || undefined,
+        groupId: selectedGroupId,
+        photoUrls: photoUrls.length > 0 ? photoUrls : undefined,
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Failed to save visit");
+      if (res?.serverError || res?.validationErrors) {
+        throw new Error(res.serverError || "Failed to save visit");
       }
       onClose();
       router.refresh();

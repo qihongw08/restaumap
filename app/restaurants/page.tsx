@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ShareLinkButton } from "@/components/share/share-link-button";
 import { BackLink } from "@/components/shared/back-link";
+import { createUserShareAction } from "@/app/actions/share";
 
 const PAGE_SIZE = 10;
 
@@ -69,7 +70,7 @@ export default async function CollectionPage() {
             My Collection
           </h1>
           <ShareLinkButton
-            endpoint="/api/share/user"
+            action={createUserShareAction.bind(null, {})}
             label="Share"
             className="shrink-0 rounded-xl border border-black/15 bg-white px-4 py-2 text-xs shadow-sm"
           />

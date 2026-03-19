@@ -45,52 +45,84 @@ export default async function MapPage({
     .sort((a, b) => a.name.localeCompare(b.name));
 
   // Lightweight markers + visit log markers — fetched in parallel
-  const [userRestaurants, visitLogs] = await Promise.all([
-    prisma.userRestaurant.findMany({
-      where: {
-        userId: user.id,
-        isBlacklisted: false,
-        ...(groupId
-          ? { restaurant: { groupRestaurants: { some: { groupId } } } }
-          : {}),
-      },
-      select: {
-        status: true,
-        restaurant: {
-          select: { id: true, name: true, latitude: true, longitude: true },
+  const [userStatuses, groupRestaurants, personalRestaurants, visitLogs] =
+    await Promise.all([
+      // User's personal statuses (to show visited/favorite icons)
+      prisma.userRestaurant.findMany({
+        where: { userId: user.id },
+        select: { restaurantId: true, status: true },
+      }),
+      // Group's shared restaurants (if in group view)
+      groupId
+        ? prisma.groupRestaurant.findMany({
+            where: { groupId },
+            include: {
+              restaurant: {
+                select: {
+                  id: true,
+                  name: true,
+                  latitude: true,
+                  longitude: true,
+                },
+              },
+            },
+          })
+        : Promise.resolve([]),
+      // Personal restaurants (if NOT in group view)
+      !groupId
+        ? prisma.userRestaurant.findMany({
+            where: { userId: user.id, isBlacklisted: false },
+            select: {
+              status: true,
+              restaurant: {
+                select: {
+                  id: true,
+                  name: true,
+                  latitude: true,
+                  longitude: true,
+                },
+              },
+            },
+          })
+        : Promise.resolve([]),
+      // Collective or personal visits
+      prisma.visit.findMany({
+        where: {
+          ...(groupId ? { groupId } : { userId: user.id }),
+          restaurant: { latitude: { not: null }, longitude: { not: null } },
         },
-      },
-    }),
-    prisma.visit.findMany({
-      where: {
-        userId: user.id,
-        ...(groupId ? { groupId } : {}),
-        restaurant: { latitude: { not: null }, longitude: { not: null } },
-      },
-      select: {
-        id: true,
-        restaurantId: true,
-        visitDate: true,
-        fullnessScore: true,
-        tasteScore: true,
-        pricePaid: true,
-        notes: true,
-        photos: { select: { url: true }, take: 1 },
-        restaurant: {
-          select: { id: true, name: true, latitude: true, longitude: true },
+        select: {
+          id: true,
+          restaurantId: true,
+          visitDate: true,
+          photos: { select: { url: true }, take: 1 },
+          restaurant: {
+            select: { id: true, name: true, latitude: true, longitude: true },
+          },
         },
-      },
-      orderBy: { visitDate: "desc" },
-    }),
-  ]);
+        orderBy: { visitDate: "desc" },
+      }),
+    ]);
 
-  const markers: MarkerData[] = userRestaurants.map((ur) => ({
-    id: ur.restaurant.id,
-    name: ur.restaurant.name,
-    latitude: ur.restaurant.latitude,
-    longitude: ur.restaurant.longitude,
-    status: ur.status,
-  }));
+  const statusMap = Object.fromEntries(
+    userStatuses.map((s) => [s.restaurantId, s.status]),
+  );
+
+  const markers: MarkerData[] = groupId
+    ? groupRestaurants.map((gr) => ({
+        id: gr.restaurant.id,
+        name: gr.restaurant.name,
+        latitude: gr.restaurant.latitude,
+        longitude: gr.restaurant.longitude,
+        status: statusMap[gr.restaurant.id] ?? "WANT_TO_GO",
+      }))
+    : personalRestaurants.map((ur) => ({
+        id: ur.restaurant.id,
+        name: ur.restaurant.name,
+        latitude: ur.restaurant.latitude,
+        longitude: ur.restaurant.longitude,
+        status: ur.status,
+      }));
 
   const serializedVisitLogs = visitLogs.map((v) => ({
     id: v.id,
@@ -115,6 +147,7 @@ export default async function MapPage({
             highlightRestaurantId={params.restaurant ?? null}
             selectedGroupId={groupId}
             groupOptions={groupOptions}
+            currentUserId={user.id}
           />
         </Suspense>
       </main>

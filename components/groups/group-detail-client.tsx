@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { ShareLinkButton } from "@/components/share/share-link-button";
@@ -21,6 +21,15 @@ import {
   Sparkles,
   Map,
 } from "lucide-react";
+import {
+  createGroupInviteAction,
+  removeRestaurantFromGroupAction,
+  addRestaurantToGroupAction,
+  removeMemberAction,
+  leaveGroupAction,
+} from "@/app/actions/groups";
+import { createGroupShareAction } from "@/app/actions/share";
+import { getRestaurantsAction } from "@/app/actions/restaurants";
 
 type MemberUser = {
   username: string | null;
@@ -58,11 +67,10 @@ export type GroupDetailData = {
 
 export function GroupDetailClient({ group }: { group: GroupDetailData }) {
   const router = useRouter();
-  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
-  const [inviteLoading, setInviteLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const fromJoin = searchParams.get("fromJoin") === "true";
   const [addRestaurantOpen, setAddRestaurantOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
-  const [copySuccess, setCopySuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isOwner = group.currentMember?.role === "owner";
@@ -77,43 +85,52 @@ export function GroupDetailClient({ group }: { group: GroupDetailData }) {
     return items;
   }, [group.groupRestaurants]);
 
-  const handleCreateInvite = async () => {
-    setInviteLoading(true);
-    try {
-      const res = await fetch(`/api/groups/${group.id}/invites`, {
-        method: "POST",
-      });
-      if (!res.ok) throw new Error("Failed to create invite");
-      const json = await res.json();
-      const base = typeof window !== "undefined" ? window.location.origin : "";
-      setInviteUrl(`${base}${json.data.joinUrl}`);
-    } catch {
-      setError("Could not create invite link");
-    } finally {
-      setInviteLoading(false);
-    }
-  };
 
-  const handleCopyInvite = () => {
-    if (!inviteUrl) return;
-    navigator.clipboard.writeText(inviteUrl);
-    setCopySuccess(true);
-    setTimeout(() => setCopySuccess(false), 2000);
-  };
 
   const handleRemoveRestaurant = async (restaurantId: string) => {
     if (!confirm("Remove this restaurant from the group?")) return;
     try {
-      const res = await fetch(
-        `/api/groups/${group.id}/restaurants/${restaurantId}`,
-        {
-          method: "DELETE",
-        },
-      );
-      if (!res.ok) throw new Error("Failed to remove");
+      const res = await removeRestaurantFromGroupAction({
+        groupId: group.id,
+        restaurantId,
+      });
+      if (res?.serverError || res?.validationErrors) {
+        throw new Error(res?.serverError || "Failed to remove");
+      }
       router.refresh();
-    } catch {
-      setError("Could not remove restaurant");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not remove restaurant");
+    }
+  };
+
+  const handleRemoveMember = async (userId: string) => {
+    if (!confirm("Remove this member from the group?")) return;
+    try {
+      const res = await removeMemberAction({ groupId: group.id, userId });
+      if (res?.serverError || res?.validationErrors) {
+        throw new Error(res?.serverError || "Failed to remove member");
+      }
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not remove member");
+    }
+  };
+
+  const handleLeaveGroup = async () => {
+    if (
+      !confirm(
+        "Are you sure you want to leave this group? You will need a new invite to join back.",
+      )
+    )
+      return;
+    try {
+      const res = await leaveGroupAction({ groupId: group.id });
+      if (res?.serverError || res?.validationErrors) {
+        throw new Error(res?.serverError || "Failed to leave group");
+      }
+      router.replace("/");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not leave group");
     }
   };
 
@@ -121,10 +138,16 @@ export function GroupDetailClient({ group }: { group: GroupDetailData }) {
     <main className="mx-auto max-w-lg px-6">
       <button
         type="button"
-        onClick={() => router.back()}
+        onClick={() => {
+          if (fromJoin) {
+            router.replace("/");
+          } else {
+            router.back();
+          }
+        }}
         className="mb-6 inline-flex items-center gap-1 text-sm font-bold text-muted-foreground hover:text-foreground"
       >
-        <ChevronRight className="h-4 w-4 rotate-180" /> Back to groups
+        <ChevronRight className="h-4 w-4 rotate-180" />
       </button>
 
       {error && (
@@ -143,44 +166,14 @@ export function GroupDetailClient({ group }: { group: GroupDetailData }) {
         </p>
         {isOwner && (
           <div className="mt-4">
-            {inviteUrl ? (
-              <div
-                className={`flex items-center gap-2 rounded-xl border-2 px-3 py-2 transition-all ${copySuccess ? "border-primary bg-primary/10 ring-2 ring-primary/30" : "border-border bg-background/60"}`}
-              >
-                <input
-                  readOnly
-                  value={inviteUrl}
-                  className="min-w-0 flex-1 bg-transparent text-xs text-foreground outline-none"
-                />
-                <Button
-                  size="sm"
-                  variant={copySuccess ? "primary" : "secondary"}
-                  onClick={handleCopyInvite}
-                  className="shrink-0"
-                >
-                  {copySuccess ? (
-                    <Check className="h-4 w-4" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-            ) : (
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={handleCreateInvite}
-                disabled={inviteLoading}
-                className="gap-2"
-              >
-                {inviteLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Link2 className="h-4 w-4" />
-                )}
-                Invite by link
-              </Button>
-            )}
+            <ShareLinkButton
+              action={() =>
+                createGroupInviteAction({ groupId: group.id }) as any
+              }
+              variant="floating"
+              label="Invite member"
+              className="w-full justify-center py-2.5"
+            />
           </div>
         )}
       </div>
@@ -193,6 +186,9 @@ export function GroupDetailClient({ group }: { group: GroupDetailData }) {
         <MembersList
           members={group.members}
           currentUserId={group.currentUserId}
+          isOwner={isOwner}
+          onRemove={handleRemoveMember}
+          onLeave={handleLeaveGroup}
         />
       </div>
 
@@ -237,6 +233,9 @@ export function GroupDetailClient({ group }: { group: GroupDetailData }) {
         <MembersList
           members={group.members}
           currentUserId={group.currentUserId}
+          isOwner={isOwner}
+          onRemove={handleRemoveMember}
+          onLeave={handleLeaveGroup}
         />
       </Modal>
 
@@ -246,9 +245,12 @@ export function GroupDetailClient({ group }: { group: GroupDetailData }) {
         </h2>
         <div className="grid grid-cols-2 gap-2">
           <ShareLinkButton
-            endpoint={`/api/share/group/${group.id}`}
+            action={() =>
+              createGroupShareAction({ groupId: group.id }) as any
+            }
+            variant="secondary"
             label="Share"
-            className="w-full justify-center rounded-xl border border-black/15 bg-white px-3 py-2 text-xs shadow-sm"
+            className="w-full justify-center py-2"
           />
           <Link
             href={`/map?groupId=${group.id}`}
@@ -417,9 +419,15 @@ export function GroupDetailClient({ group }: { group: GroupDetailData }) {
 function MembersList({
   members,
   currentUserId,
+  isOwner,
+  onRemove,
+  onLeave,
 }: {
   members: GroupMember[];
   currentUserId: string;
+  isOwner: boolean;
+  onRemove: (userId: string) => void;
+  onLeave: () => void;
 }) {
   const sorted = [...members].sort((a, b) =>
     a.role === "owner" ? -1 : b.role === "owner" ? 1 : 0,
@@ -456,13 +464,36 @@ function MembersList({
                 {displayName}
               </span>
             </div>
-            <span
-              className={`shrink-0 text-xs font-bold uppercase tracking-wider ${
-                m.role === "owner" ? "text-primary" : "text-muted-foreground"
-              }`}
-            >
-              {m.role}
-            </span>
+            <div className="flex items-center gap-2">
+              <span
+                className={`shrink-0 text-xs font-bold uppercase tracking-wider ${
+                  m.role === "owner" ? "text-primary" : "text-muted-foreground"
+                }`}
+              >
+                {m.role}
+              </span>
+              {isOwner && m.userId !== currentUserId && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="size-8 p-0 text-muted-foreground hover:text-destructive"
+                  onClick={() => onRemove(m.userId)}
+                  aria-label="Remove member"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+              {m.userId === currentUserId && m.role !== "owner" && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="px-2 py-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:bg-destructive/10 hover:text-destructive h-auto"
+                  onClick={onLeave}
+                >
+                  Leave
+                </Button>
+              )}
+            </div>
           </li>
         );
       })}
@@ -494,9 +525,12 @@ function AddRestaurantModal({
     setPrevOpen(open);
     if (open) {
       setLoading(true);
-      fetch("/api/restaurants")
-        .then((r) => r.json())
-        .then((json) => setRestaurants(json.data ?? []))
+      getRestaurantsAction({})
+        .then((res) => {
+          if (res?.data) {
+            setRestaurants(res.data.data ?? []);
+          }
+        })
         .catch(() => setRestaurants([]))
         .finally(() => setLoading(false));
     }
@@ -509,12 +543,13 @@ function AddRestaurantModal({
   const handleAdd = async (restaurantId: string) => {
     setAddingId(restaurantId);
     try {
-      const res = await fetch(`/api/groups/${groupId}/restaurants`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ restaurantId }),
+      const res = await addRestaurantToGroupAction({
+        groupId,
+        restaurantId,
       });
-      if (!res.ok) throw new Error("Failed to add");
+      if (res?.serverError || res?.validationErrors) {
+        throw new Error(res?.serverError || "Failed to add");
+      }
       onAdded();
       onClose();
     } catch {

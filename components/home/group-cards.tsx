@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Plus, GripVertical } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
+import { reorderGroupsAction } from "@/app/actions/groups";
 
 interface GroupCardData {
   id: string;
@@ -40,12 +41,10 @@ export function GroupCards({ groups: initialGroups }: GroupCardsProps) {
     setGroups(items);
 
     try {
-      const res = await fetch("/api/groups/reorder", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ groupIds: items.map((g) => g.id) }),
-      });
-      if (!res.ok) throw new Error("API error");
+      const res = await reorderGroupsAction({ groupIds: items.map((g) => g.id) });
+      if (res?.serverError) {
+        throw new Error(res.serverError);
+      }
     } catch (error) {
       console.error("Failed to reorder groups", error);
       setGroups(groups); // Revert on error

@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { geocodeAction } from '@/app/actions/places';
+import { createRestaurantAction } from '@/app/actions/restaurants';
 import { PRICE_RANGE_OPTIONS } from '@/lib/constants';
 
 interface RestaurantFormProps {
@@ -34,43 +36,35 @@ export function RestaurantForm({ onSuccess }: RestaurantFormProps) {
       let formattedAddress: string | null = address.trim() || null;
 
       if (address.trim()) {
-        const geoRes = await fetch('/api/geocode', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ address: address.trim() }),
-        });
-        if (geoRes.ok) {
-          const geoJson = await geoRes.json();
-          latitude = geoJson.data?.latitude ?? null;
-          longitude = geoJson.data?.longitude ?? null;
-          formattedAddress = geoJson.data?.formattedAddress ?? address.trim();
+        const geoRes = await geocodeAction({ address: address.trim() });
+        if (geoRes?.data) {
+          latitude = geoRes.data.latitude ?? null;
+          longitude = geoRes.data.longitude ?? null;
+          formattedAddress = geoRes.data.formattedAddress ?? address.trim();
         }
       }
 
-      const res = await fetch('/api/restaurants', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          address: address.trim() || null,
-          formattedAddress,
-          latitude,
-          longitude,
-          cuisineTypes: cuisineTypes
-            ? cuisineTypes.split(',').map((s) => s.trim()).filter(Boolean)
-            : [],
-          popularDishes: [],
-          priceRange: priceRange || null,
-          ambianceTags: [],
-        }),
+      const res = await createRestaurantAction({
+        name: name.trim(),
+        address: address.trim() || null,
+        formattedAddress,
+        latitude,
+        longitude,
+        cuisineTypes: cuisineTypes
+          ? cuisineTypes.split(',').map((s) => s.trim()).filter(Boolean)
+          : [],
+        popularDishes: [],
+        priceRange: priceRange || null,
+        ambianceTags: [],
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? 'Failed to create restaurant');
+
+      if (res?.serverError || res?.validationErrors) {
+        throw new Error(res?.serverError || 'Failed to create restaurant');
       }
-      const json = await res.json();
+
       onSuccess?.();
-      router.push(`/restaurants/${json.data.id}`);
+      // @ts-ignore
+      router.push(`/restaurants/${res.data?.id}`);
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong');

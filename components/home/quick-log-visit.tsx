@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { LogVisitModal } from "@/components/visits/log-visit-modal";
 import { Search, Loader2, MapPin, Plus } from "lucide-react";
+import { searchPlacesAction } from "@/app/actions/places";
+import { getRestaurantsAction, createRestaurantAction } from "@/app/actions/restaurants";
+import { extractRestaurantAction } from "@/app/actions/extract";
 
 interface SearchResult {
   id: string;
@@ -44,56 +47,35 @@ export function QuickLogVisit({
       if (mode === "addOnly") {
         let googleResults: SearchResult[] = [];
         try {
-          const placesRes = await fetch("/api/places/search", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: q }),
-          });
-          if (placesRes.ok) {
-            const placesJson = await placesRes.json();
-            googleResults = (placesJson.data ?? []).map(
-              (p: {
-                placeId: string;
-                name: string;
-                formattedAddress?: string;
-                latitude?: number | null;
-                longitude?: number | null;
-              }) => ({
-                id: p.placeId,
-                name: p.name,
-                address: p.formattedAddress,
-                source: "google" as const,
-                latitude: p.latitude,
-                longitude: p.longitude,
-                googlePlaceId: p.placeId,
-              }),
-            );
+          const placesRes = await searchPlacesAction({ name: q, addressOrRegion: "" });
+          if (!placesRes?.serverError) {
+            googleResults = (placesRes?.data ?? []).map((p: any) => ({
+              id: p.placeId,
+              name: p.name,
+              address: p.formattedAddress,
+              source: "google" as const,
+              latitude: p.latitude,
+              longitude: p.longitude,
+              googlePlaceId: p.placeId,
+            }));
           }
         } catch {}
         setResults(googleResults);
         return;
       }
 
-      const savedRes = await fetch(
-        `/api/restaurants?limit=5&cuisine=${encodeURIComponent(q)}`,
-      );
-      const savedJson = await savedRes.json();
-      const saved: SearchResult[] = (savedJson.data ?? []).map(
-        (r: { id: string; name: string; formattedAddress?: string }) => ({
-          id: r.id,
-          name: r.name,
-          address: r.formattedAddress,
-          source: "saved" as const,
-        }),
-      );
+      const savedRes = await getRestaurantsAction({ limit: 5, cuisine: q });
+      const saved: SearchResult[] = (savedRes?.data?.data ?? []).map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        address: r.formattedAddress,
+        source: "saved" as const,
+      }));
 
-      const nameRes = await fetch(`/api/restaurants?limit=10`);
-      const nameJson = await nameRes.json();
-      const nameMatched: SearchResult[] = (nameJson.data ?? [])
-        .filter((r: { name: string }) =>
-          r.name.toLowerCase().includes(q.toLowerCase()),
-        )
-        .map((r: { id: string; name: string; formattedAddress?: string }) => ({
+      const nameRes = await getRestaurantsAction({ limit: 10 });
+      const nameMatched: SearchResult[] = (nameRes?.data?.data ?? [])
+        .filter((r: { name: string }) => r.name.toLowerCase().includes(q.toLowerCase()))
+        .map((r: any) => ({
           id: r.id,
           name: r.name,
           address: r.formattedAddress,
@@ -101,49 +83,28 @@ export function QuickLogVisit({
         }));
 
       const savedMap = new Map<string, SearchResult>();
-      for (const r of [...saved, ...nameMatched]) {
-        savedMap.set(r.id, r);
-      }
+      for (const r of [...saved, ...nameMatched]) savedMap.set(r.id, r);
       const dedupedSaved = [...savedMap.values()];
 
       let googleResults: SearchResult[] = [];
       try {
-        const placesRes = await fetch("/api/places/search", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: q }),
-        });
-        if (placesRes.ok) {
-          const placesJson = await placesRes.json();
-          googleResults = (placesJson.data ?? [])
-            .filter(
-              (p: { placeId?: string }) =>
-                !dedupedSaved.some(
-                  (s) => s.googlePlaceId && s.googlePlaceId === p.placeId,
-                ),
-            )
-            .map(
-              (p: {
-                placeId: string;
-                name: string;
-                formattedAddress?: string;
-                latitude?: number | null;
-                longitude?: number | null;
-              }) => ({
-                id: p.placeId,
-                name: p.name,
-                address: p.formattedAddress,
-                source: "google" as const,
-                latitude: p.latitude,
-                longitude: p.longitude,
-                googlePlaceId: p.placeId,
-              }),
-            );
+        const placesRes = await searchPlacesAction({ name: q, addressOrRegion: "" });
+        if (!placesRes?.serverError) {
+          googleResults = (placesRes?.data ?? [])
+            .filter((p: any) => !dedupedSaved.some((s) => s.googlePlaceId && s.googlePlaceId === p.placeId))
+            .map((p: any) => ({
+              id: p.placeId,
+              name: p.name,
+              address: p.formattedAddress,
+              source: "google" as const,
+              latitude: p.latitude,
+              longitude: p.longitude,
+              googlePlaceId: p.placeId,
+            }));
         }
-      } catch {
-        // Google search failed, continue with saved results only
-      }
-
+      } catch {}
+      // Google search failed, continue with saved results only
+      
       setResults([...dedupedSaved, ...googleResults]);
     } finally {
       setSearching(false);
@@ -164,45 +125,35 @@ export function QuickLogVisit({
     if (!result.googlePlaceId) return;
     setSaving(true);
     try {
-      // Enrich via AI then create
-      const enrichRes = await fetch("/api/extract-restaurant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: result.name,
-          address: result.address ?? "",
-        }),
+      const enrichRes = await extractRestaurantAction({
+        name: result.name,
+        addressOrRegion: result.address ?? "",
       });
-      const enrichJson = enrichRes.ok ? await enrichRes.json() : { data: {} };
-      const enriched = enrichJson.data ?? {};
+      const enriched: any = enrichRes?.data ?? {};
 
-      // Create restaurant
-      const createRes = await fetch("/api/restaurants", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: result.name,
-          formattedAddress: result.address,
-          googlePlaceId: result.googlePlaceId,
-          latitude: result.latitude ?? null,
-          longitude: result.longitude ?? null,
-          openingHoursWeekdayText: enriched.openingHoursWeekdayText ?? [],
-          cuisineTypes: enriched.cuisineTypes ?? [],
-          popularDishes: enriched.popularDishes ?? [],
-          priceRange: enriched.priceRange ?? null,
-          ambianceTags: enriched.ambianceTags ?? [],
-          status: mode === "addOnly" ? "WANT_TO_GO" : "VISITED",
-        }),
+      const createRes = await createRestaurantAction({
+        name: result.name,
+        formattedAddress: result.address,
+        googlePlaceId: result.googlePlaceId,
+        latitude: result.latitude ?? null,
+        longitude: result.longitude ?? null,
+        openingHoursWeekdayText: Array.isArray(enriched.openingHoursWeekdayText) ? enriched.openingHoursWeekdayText : [],
+        cuisineTypes: Array.isArray(enriched.cuisineTypes) ? enriched.cuisineTypes : [],
+        popularDishes: Array.isArray(enriched.popularDishes) ? enriched.popularDishes : [],
+        priceRange: typeof enriched.priceRange === "string" ? enriched.priceRange : null,
+        ambianceTags: Array.isArray(enriched.ambianceTags) ? enriched.ambianceTags : [],
+        status: mode === "addOnly" ? "WANT_TO_GO" : "VISITED",
       });
 
-      if (createRes.ok) {
-        const createJson = await createRes.json();
+      if (!createRes?.serverError && !createRes?.validationErrors) {
         if (mode === "addOnly") {
           onClose();
-          router.push(`/restaurants/${createJson.data.id}`);
+          // @ts-ignore
+          router.push(`/restaurants/${createRes.data?.id}`);
           router.refresh();
         } else {
-          setSelectedRestaurantId(createJson.data.id);
+          // @ts-ignore
+          setSelectedRestaurantId(createRes.data?.id);
         }
       }
     } finally {

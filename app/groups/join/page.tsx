@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Nav } from "@/components/shared/nav";
 import { Loader2 } from "lucide-react";
+import { joinGroupAction } from "@/app/actions/groups";
 
 function GroupJoinContent() {
   const router = useRouter();
@@ -20,26 +21,20 @@ function GroupJoinContent() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/groups/join", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token }),
-        });
+        const res = await joinGroupAction({ token });
         if (cancelled) return;
-        if (res.status === 401) {
-          const joinUrl = `/groups/join?token=${encodeURIComponent(token)}`;
-          router.replace(`/login?next=${encodeURIComponent(joinUrl)}`);
+        if (res?.serverError === "Unauthorized") {
+          const next = encodeURIComponent(window.location.pathname + window.location.search);
+          router.push(`/login?next=${next}`);
           return;
         }
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          setMessage(data.error ?? "Could not join group");
+        if (res?.serverError || res?.validationErrors || !res?.data) {
+          setMessage(res?.serverError || "Could not join group");
           setStatus("error");
           return;
         }
-        const json = await res.json();
         setStatus("done");
-        router.replace(`/groups/${json.data.groupId}`);
+        router.replace(`/groups/${res.data.groupId}?fromJoin=true`);
       } catch {
         if (!cancelled) {
           setMessage("Something went wrong");

@@ -4,6 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { searchPlacesAction } from "@/app/actions/places";
+import { extractRestaurantAction } from "@/app/actions/extract";
+import { createRestaurantAction } from "@/app/actions/restaurants";
 
 type PlaceCandidate = {
   placeId: string;
@@ -39,17 +42,13 @@ export function NewRestaurantContent() {
     setCandidates([]);
     setSelectedPlaceId(null);
     try {
-      const res = await fetch("/api/places/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: query.trim(),
-          addressOrRegion: "",
-        }),
+      const res = await searchPlacesAction({
+        name: query.trim(),
+        addressOrRegion: "",
       });
-      if (!res.ok) throw new Error("Could not search Google Places");
-      const json = await res.json();
-      const next = (json.data ?? []) as PlaceCandidate[];
+      if (res?.serverError) throw new Error(res.serverError);
+      
+      const next = (res?.data ?? []) as PlaceCandidate[];
       setCandidates(next);
       if (next.length === 1) setSelectedPlaceId(next[0].placeId);
     } catch (e) {
@@ -69,54 +68,45 @@ export function NewRestaurantContent() {
     setIsSaving(true);
     setError(null);
     try {
-      const enrichRes = await fetch("/api/extract-restaurant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: selected.name,
-          addressOrRegion: selected.formattedAddress ?? "",
-        }),
+      const enrichRes = await extractRestaurantAction({
+        name: selected.name,
+        addressOrRegion: selected.formattedAddress ?? "",
       });
-      if (!enrichRes.ok) {
+      if (enrichRes?.serverError) {
         throw new Error("Could not enrich restaurant details");
       }
-      const enrichJson = await enrichRes.json();
-      const extracted = (enrichJson.data ?? {}) as GroqExtracted;
+      
+      const extracted = (enrichRes?.data ?? {}) as GroqExtracted;
 
-      const res = await fetch("/api/restaurants", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: selected.name,
-          address: selected.formattedAddress,
-          formattedAddress: selected.formattedAddress,
-          latitude: selected.latitude ?? null,
-          longitude: selected.longitude ?? null,
-          googlePlaceId: selected.placeId,
-          openingHoursWeekdayText: Array.isArray(
-            extracted.openingHoursWeekdayText,
-          )
-            ? extracted.openingHoursWeekdayText
-            : [],
-          cuisineTypes: Array.isArray(extracted.cuisineTypes)
-            ? extracted.cuisineTypes
-            : [],
-          popularDishes: Array.isArray(extracted.popularDishes)
-            ? extracted.popularDishes
-            : [],
-          priceRange:
-            typeof extracted.priceRange === "string" ||
-            extracted.priceRange === null
-              ? extracted.priceRange
-              : null,
-          ambianceTags: Array.isArray(extracted.ambianceTags)
-            ? extracted.ambianceTags
-            : [],
-        }),
+      const res = await createRestaurantAction({
+        name: selected.name,
+        address: selected.formattedAddress,
+        formattedAddress: selected.formattedAddress,
+        latitude: selected.latitude ?? null,
+        longitude: selected.longitude ?? null,
+        googlePlaceId: selected.placeId,
+        openingHoursWeekdayText: Array.isArray(extracted.openingHoursWeekdayText)
+          ? extracted.openingHoursWeekdayText
+          : [],
+        cuisineTypes: Array.isArray(extracted.cuisineTypes)
+          ? extracted.cuisineTypes
+          : [],
+        popularDishes: Array.isArray(extracted.popularDishes)
+          ? extracted.popularDishes
+          : [],
+        priceRange:
+          typeof extracted.priceRange === "string" || extracted.priceRange === null
+            ? extracted.priceRange
+            : null,
+        ambianceTags: Array.isArray(extracted.ambianceTags)
+          ? extracted.ambianceTags
+          : [],
       });
-      if (!res.ok) throw new Error("Failed to save restaurant");
-      const json = await res.json();
-      router.push(`/restaurants/${json.data.id}`);
+
+      if (res?.serverError || res?.validationErrors) throw new Error("Failed to save restaurant");
+      
+      // @ts-ignore
+      router.push(`/restaurants/${res.data?.id}`);
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save");

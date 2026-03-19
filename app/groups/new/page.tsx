@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Nav } from '@/components/shared/nav';
 import { Button } from '@/components/ui/button';
+import { createGroupAction } from '@/app/actions/groups';
 import { ChevronRight } from 'lucide-react';
 
 export default function NewGroupPage() {
@@ -18,17 +19,13 @@ export default function NewGroupPage() {
     setIsSubmitting(true);
     setError(null);
     try {
-      const res = await fetch('/api/groups', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? 'Failed to create group');
+      const res = await createGroupAction({ name: name.trim() });
+      if (res?.serverError || res?.validationErrors) {
+        throw new Error(res?.serverError || "Failed to create group");
       }
-      const json = await res.json();
-      router.push(`/groups/${json.data.id}`);
+      if (res?.data) {
+        router.replace(`/groups/${res.data.id}`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create group');
     } finally {
@@ -45,7 +42,7 @@ export default function NewGroupPage() {
           onClick={() => router.back()}
           className="mb-6 inline-flex items-center gap-1 text-sm font-bold text-muted-foreground hover:text-foreground"
         >
-          <ChevronRight className="h-4 w-4 rotate-180" /> Back to groups
+          <ChevronRight className="h-4 w-4 rotate-180" />
         </button>
         <h1 className="text-2xl font-black italic tracking-tighter text-foreground uppercase">
           New group

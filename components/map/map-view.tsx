@@ -10,6 +10,10 @@ import type { MarkerData } from "@/types/restaurant";
 import type { VisitLogMarker, VisitLogWithLocation } from "@/types/visit";
 import type { RestaurantWithDetails } from "@/types/restaurant";
 import { Loader2 } from "lucide-react";
+import { getVisitMarkersAction, getVisitsAction } from "@/app/actions/visits";
+import { getCuisinesAction, getRestaurantsAction } from "@/app/actions/restaurants";
+
+const EMPTY_ARRAY: any[] = [];
 
 const DEFAULT_CENTER = { lat: 40.7, lng: -74 };
 const DEFAULT_ZOOM = 10;
@@ -34,24 +38,27 @@ interface MapViewProps {
   /** Share pages pass full restaurant data; markers are derived from it */
   restaurants?: RestaurantWithDetails[];
   showPhotos?: boolean;
+  currentUserId?: string | null;
 }
 
 export function MapView({
   markers: markersProp,
-  visitLogMarkers = [],
+  visitLogMarkers: visitLogMarkersProp = EMPTY_ARRAY,
   highlightRestaurantId = null,
   selectedGroupId = null,
-  groupOptions = [],
+  groupOptions = EMPTY_ARRAY,
   shareToken = null,
   restaurants,
   showPhotos = true,
+  currentUserId = null,
 }: MapViewProps) {
+  const visitLogMarkers = visitLogMarkersProp;
   const router = useRouter();
   const searchParams = useSearchParams();
 
   // Derive markers from restaurants prop when markers aren't provided (share pages)
   const markers: MarkerData[] = useMemo(() => {
-    if (markersProp) return markersProp;
+    if (markersProp && markersProp.length > 0) return markersProp;
     if (restaurants) {
       return restaurants.map((r) => ({
         id: r.id,
@@ -83,8 +90,17 @@ export function MapView({
   const [logMarkers, setLogMarkers] =
     useState<VisitLogMarker[]>(visitLogMarkers);
 
+  // Sync state with props only when the prop reference actually changes
+  // and it's different from what we currently have.
   useEffect(() => {
-    setLogMarkers(visitLogMarkers);
+    setLogMarkers((current) => {
+      // Deep-ish comparison to avoid infinite loops if prop is unstable
+      if (current.length === visitLogMarkers.length &&
+          current.every((m, i) => m.id === visitLogMarkers[i]?.id)) {
+        return current;
+      }
+      return visitLogMarkers;
+    });
   }, [visitLogMarkers]);
 
   const markersInAppliedBounds = useMemo(() => {
@@ -249,16 +265,16 @@ export function MapView({
   const handleSearchLogsHere = useCallback(async () => {
     if (!bounds) return;
     setAppliedLogBounds(bounds);
-    const params = new URLSearchParams();
-    if (selectedGroupId) params.set("groupId", selectedGroupId);
-    params.set("minLat", bounds.south.toString());
-    params.set("maxLat", bounds.north.toString());
-    params.set("minLng", bounds.west.toString());
-    params.set("maxLng", bounds.east.toString());
-    const res = await fetch(`/api/visits/markers?${params.toString()}`);
-    if (!res.ok) return;
-    const json = (await res.json()) as { data?: VisitLogMarker[] };
-    setLogMarkers(json.data ?? []);
+    const res = await getVisitMarkersAction({
+      groupId: selectedGroupId,
+      minLat: bounds.south,
+      maxLat: bounds.north,
+      minLng: bounds.west,
+      maxLng: bounds.east,
+      limit: 200,
+    });
+    if (res?.serverError || res?.validationErrors || !res?.data) return;
+    setLogMarkers((res.data.data as VisitLogMarker[]) ?? []);
   }, [bounds, selectedGroupId]);
 
   const handleRestaurantClick = useCallback(
@@ -421,6 +437,8 @@ export function MapView({
           restaurantId={selectedLogRestaurantId}
           isOpen={sheetOpen && selectedLogRestaurantId !== null}
           onOpenChange={handleSheetOpenChange}
+          groupId={selectedGroupId}
+          currentUserId={currentUserId}
         />
       )}
     </>
@@ -446,48 +464,41 @@ function SWRBottomSheet({
   const [category, setCategory] = useState("All");
   const [priceRange, setPriceRange] = useState<string | null>(null);
   const [restaurants, setRestaurants] = useState<RestaurantWithDetails[]>([]);
+  const [cuisines, setCuisines] = useState<string[]>([]);
 
   // Fetch available cuisines once
-  const { data: cuisinesData } = useSWR<{ data: string[] }>(
-    "/api/restaurants/cuisines",
-    fetcher,
-  );
-  const cuisines = cuisinesData?.data ?? [];
-
-  const buildUrl = useCallback(() => {
-    const params = new URLSearchParams({ limit: "20" });
-    if (groupId) params.set("groupId", groupId);
-    if (category !== "All") params.set("cuisine", category);
-    if (priceRange) params.set("priceRange", priceRange);
-    if (appliedBounds) {
-      params.set("minLat", appliedBounds.south.toString());
-      params.set("maxLat", appliedBounds.north.toString());
-      params.set("minLng", appliedBounds.west.toString());
-      params.set("maxLng", appliedBounds.east.toString());
-    }
-    return `/api/restaurants?${params.toString()}`;
-  }, [groupId, category, priceRange, appliedBounds]);
+  useEffect(() => {
+    getCuisinesAction().then((res) => {
+      if (res?.data) setCuisines(res.data);
+    });
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(buildUrl());
-        if (!res.ok) return;
-        const json = (await res.json()) as {
-          data?: RestaurantWithDetails[];
-        };
+        const res = await getRestaurantsAction({
+          limit: 20,
+          groupId: groupId || undefined,
+          cuisine: category !== "All" ? category : undefined,
+          priceRange: priceRange || undefined,
+          minLat: appliedBounds?.south,
+          maxLat: appliedBounds?.north,
+          minLng: appliedBounds?.west,
+          maxLng: appliedBounds?.east,
+        });
+        if (res?.serverError || res?.validationErrors || !res?.data) return;
         if (cancelled) return;
-        setRestaurants(json.data ?? []);
+        setRestaurants(res.data.data as RestaurantWithDetails[]);
       } finally {
-        // no-op: loading state removed with pagination
+        // no-op
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [buildUrl, isOpen]);
+  }, [groupId, category, priceRange, appliedBounds, isOpen]);
 
   return (
     <>
@@ -512,14 +523,26 @@ function LogsBottomSheet({
   restaurantId,
   isOpen,
   onOpenChange,
+  groupId,
+  currentUserId,
 }: {
   restaurantId: string | null;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
+  groupId: string | null;
+  currentUserId: string | null;
 }) {
-  const { data, isLoading } = useSWR<{ data: VisitLogWithLocation[] }>(
-    restaurantId ? `/api/visits?restaurantId=${restaurantId}&limit=10` : null,
-    fetcher,
+  const { data, isLoading } = useSWR(
+    restaurantId ? ["visits", restaurantId, groupId] : null,
+    async () => {
+      if (!restaurantId) return { data: [] as VisitLogWithLocation[] };
+      const res = await getVisitsAction({ 
+        restaurantId, 
+        groupId: groupId || undefined,
+        limit: 10 
+      });
+      return { data: (res?.data?.data as VisitLogWithLocation[]) ?? [] };
+    }
   );
 
   if (!isOpen || !restaurantId) return null;
@@ -564,7 +587,7 @@ function LogsBottomSheet({
                       name: v.restaurant.name,
                     },
                   }}
-                  editable
+                  editable={v.userId === currentUserId}
                 />
               </li>
             ))}

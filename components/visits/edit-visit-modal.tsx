@@ -10,6 +10,9 @@ import { PF_RATIO_FULLNESS_MAX, PF_RATIO_TASTE_MAX } from "@/lib/constants";
 import { ImageIcon, Plus, X, Trash2 } from "lucide-react";
 import type { VisitWithPhotos } from "@/types/visit";
 import Image from "next/image";
+import { presignUploadsAction } from "@/app/actions/upload";
+import { createPhotosAction, deletePhotoAction } from "@/app/actions/photos";
+import { updateVisitAction, deleteVisitAction } from "@/app/actions/visits";
 
 const R2_BASE = process.env.NEXT_PUBLIC_R2_PUBLIC_URL ?? "";
 function isR2Url(url: string) {
@@ -87,30 +90,23 @@ export function EditVisitModal({
 
     try {
       for (const photoId of removedPhotoIds) {
-        const delRes = await fetch(`/api/photos/${photoId}`, {
-          method: "DELETE",
-        });
-        if (!delRes.ok) {
-          const data = await delRes.json().catch(() => ({}));
-          throw new Error(data.error ?? "Failed to remove photo");
+        const delRes = await deletePhotoAction({ id: photoId });
+        if (delRes?.serverError || delRes?.validationErrors) {
+          throw new Error(delRes?.serverError || "Failed to remove photo");
         }
       }
 
       let newPhotoUrls: string[] = [];
       if (newPhotoFiles.length > 0) {
-        const presignRes = await fetch("/api/upload/presign", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            restaurantId,
-            files: newPhotoFiles.map((f) => ({ name: f.name, type: f.type, size: f.size })),
-          }),
+        const presignRes = await presignUploadsAction({
+          restaurantId,
+          groupId: null,
+          files: newPhotoFiles.map((f) => ({ name: f.name, type: f.type, size: f.size })),
         });
-        if (!presignRes.ok) {
-          const data = await presignRes.json().catch(() => ({}));
-          throw new Error(data.error ?? "Failed to get upload URL");
+        if (presignRes?.serverError || presignRes?.validationErrors || !presignRes?.data) {
+          throw new Error(presignRes?.serverError || "Failed to get upload URL");
         }
-        const { uploads } = await presignRes.json();
+        const uploads = presignRes.data.uploads;
         await Promise.all(
           newPhotoFiles.map((file, i) =>
             fetch(uploads[i].uploadUrl, {
@@ -126,31 +122,26 @@ export function EditVisitModal({
       }
 
       if (newPhotoUrls.length > 0) {
-        await fetch("/api/photos", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            visitId: visit.id,
-            restaurantId,
-            urls: newPhotoUrls,
-          }),
+        const pRes = await createPhotosAction({
+          visitId: visit.id,
+          restaurantId,
+          urls: newPhotoUrls,
         });
+        if (pRes?.serverError || pRes?.validationErrors) {
+          throw new Error(pRes?.serverError || "Failed to save new photos");
+        }
       }
 
-      const res = await fetch(`/api/visits/${visit.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          visitDate,
-          fullnessScore: clampScore(fullnessScore, 1, PF_RATIO_FULLNESS_MAX),
-          tasteScore: clampScore(tasteScore, 1, PF_RATIO_TASTE_MAX),
-          pricePaid: priceNum,
-          notes: notes || undefined,
-        }),
+      const res = await updateVisitAction({
+        id: visit.id,
+        visitDate,
+        fullnessScore: clampScore(fullnessScore, 1, PF_RATIO_FULLNESS_MAX),
+        tasteScore: clampScore(tasteScore, 1, PF_RATIO_TASTE_MAX),
+        pricePaid: priceNum,
+        notes: notes || undefined,
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Failed to update visit");
+      if (res?.serverError || res?.validationErrors) {
+        throw new Error(res?.serverError || "Failed to update visit");
       }
       onClose();
       router.refresh();
@@ -165,12 +156,9 @@ export function EditVisitModal({
     setIsDeleting(true);
     setError(null);
     try {
-      const res = await fetch(`/api/visits/${visit.id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Failed to delete visit");
+      const res = await deleteVisitAction({ id: visit.id });
+      if (res?.serverError || res?.validationErrors) {
+        throw new Error(res?.serverError || "Failed to delete visit");
       }
       onClose();
       router.refresh();

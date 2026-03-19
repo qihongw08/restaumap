@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { VisitLogCard, type VisitLogData } from "@/components/visits/visit-log-card";
 import { Loader2 } from "lucide-react";
+import { getVisitsAction } from "@/app/actions/visits";
 
 interface ProfileClientProps {
   visits: VisitLogData[];
@@ -15,15 +16,20 @@ export function ProfileClient({ visits: initialVisits, initialCursor = null }: P
   const [cursor, setCursor] = useState<string | null>(initialCursor);
   const [loadingMore, setLoadingMore] = useState(false);
 
+  useEffect(() => {
+    setVisits(initialVisits);
+    setCursor(initialCursor);
+  }, [initialVisits, initialCursor]);
+
   const loadMore = useCallback(async () => {
     if (!cursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const res = await fetch(`/api/visits?limit=10&cursor=${cursor}`);
-      if (!res.ok) return;
-      const json = await res.json();
-      setVisits((prev) => [...prev, ...(json.data ?? [])]);
-      setCursor(json.nextCursor ?? null);
+      const res = await getVisitsAction({ limit: 10, cursor });
+      if (res?.serverError || res?.validationErrors || !res?.data) return;
+      // @ts-ignore
+      setVisits((prev) => [...prev, ...(res.data.data ?? [])]);
+      setCursor(res.data.nextCursor ?? null);
     } finally {
       setLoadingMore(false);
     }

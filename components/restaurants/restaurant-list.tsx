@@ -8,6 +8,7 @@ import { useRestaurants } from "@/hooks/use-restaurants";
 import type { RestaurantWithVisits } from "@/types/restaurant";
 import { Loader2 } from "lucide-react";
 import { useLocation } from "@/hooks/use-location";
+import { deleteRestaurantAction, getRestaurantsAction } from "@/app/actions/restaurants";
 
 interface RestaurantListProps {
   status?: string;
@@ -92,14 +93,17 @@ export function RestaurantList({
     if (!cursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const params = new URLSearchParams({ limit: "10", cursor });
-      if (status) params.set("status", status);
-      if (!excludeBlacklisted) params.set("excludeBlacklisted", "false");
-      const res = await fetch(`/api/restaurants?${params}`);
-      if (!res.ok) return;
-      const json = await res.json();
-      setExtraRestaurants((prev) => [...prev, ...(json.data ?? [])]);
-      setCursor(json.nextCursor ?? null);
+      const res = await getRestaurantsAction({
+        limit: 10,
+        cursor,
+        status: (status as any) || undefined,
+        excludeBlacklisted: excludeBlacklisted === false ? false : undefined,
+      });
+      if (res?.serverError || res?.validationErrors || !res?.data) return;
+      if (res.data) {
+        setExtraRestaurants((prev) => [...prev, ...(res.data!.data ?? [])]);
+        setCursor(res.data.nextCursor ?? null);
+      }
     } finally {
       setLoadingMore(false);
     }
@@ -130,10 +134,8 @@ export function RestaurantList({
 
   const handleRemoveConfirm = async () => {
     if (!removeTarget) return;
-    const res = await fetch(`/api/restaurants/${removeTarget.id}`, {
-      method: "DELETE",
-    });
-    if (res.ok) {
+    const res = await deleteRestaurantAction({ id: removeTarget.id });
+    if (!res?.serverError && !res?.validationErrors) {
       setExtraRestaurants((prev) => prev.filter((r) => r.id !== removeTarget.id));
       refetch();
     }

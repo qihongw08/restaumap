@@ -7,6 +7,9 @@ import { Nav } from "@/components/shared/nav";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loading } from "@/components/shared/loading";
+import { extractLinkAction } from "@/app/actions/extract";
+import { searchPlacesAction } from "@/app/actions/places";
+import { importRestaurantAction } from "@/app/actions/restaurants";
 
 type Extracted = {
   name: string;
@@ -77,29 +80,20 @@ export function ImportContent({
     setSelectedPlaceId(null);
     try {
       const urlOrText = extractUrl(text) ?? text.trim();
-      const res = await fetch("/api/extract-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: urlOrText }),
-      });
-      if (!res.ok) throw new Error("Extraction failed");
-      const json = await res.json();
-      const data = json.data as Extracted;
+      const res = await extractLinkAction({ text: urlOrText });
+      if (res?.serverError) throw new Error(res.serverError);
+      
+      const data = res?.data as Extracted;
       setExtracted(data);
 
       setIsSearchingPlaces(true);
       try {
-        const searchRes = await fetch("/api/places/search", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: data.name,
-            addressOrRegion: data.address ?? "",
-          }),
+        const searchRes = await searchPlacesAction({
+          name: data.name,
+          addressOrRegion: data.address ?? "",
         });
-        if (searchRes.ok) {
-          const searchJson = await searchRes.json();
-          const candidates = (searchJson.data ?? []) as PlaceCandidate[];
+        if (!searchRes?.serverError) {
+          const candidates = (searchRes?.data ?? []) as PlaceCandidate[];
           setPlacesCandidates(candidates);
           if (candidates.length === 1)
             setSelectedPlaceId(candidates[0].placeId);
@@ -160,12 +154,8 @@ export function ImportContent({
           payload.longitude = selectedCandidate.longitude;
       }
 
-      const res = await fetch("/api/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error("Failed to save restaurant");
+      const res = await importRestaurantAction(payload);
+      if (res?.serverError || res?.validationErrors) throw new Error("Failed to save restaurant");
       setExtracted(null);
       setPlacesCandidates(null);
       setSelectedPlaceId(null);

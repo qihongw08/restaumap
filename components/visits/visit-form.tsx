@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { createVisitAction } from "@/app/actions/visits";
 import { calculatePFRatio, clampScore, cn } from "@/lib/utils";
 import { PF_RATIO_FULLNESS_MAX, PF_RATIO_TASTE_MAX } from "@/lib/constants";
 
@@ -40,21 +41,16 @@ export function VisitForm({ restaurantId }: VisitFormProps) {
     setError(null);
     setIsSubmitting(true);
     try {
-      const res = await fetch("/api/visits", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          restaurantId,
-          visitDate,
-          fullnessScore: clampScore(fullnessScore, 1, PF_RATIO_FULLNESS_MAX),
-          tasteScore: clampScore(tasteScore, 1, PF_RATIO_TASTE_MAX),
-          pricePaid: priceNum,
-          notes: notes || undefined,
-        }),
+      const res = await createVisitAction({
+        restaurantId,
+        visitDate,
+        fullnessScore: clampScore(fullnessScore, 1, PF_RATIO_FULLNESS_MAX),
+        tasteScore: clampScore(tasteScore, 1, PF_RATIO_TASTE_MAX),
+        pricePaid: priceNum,
+        notes: notes || undefined,
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Failed to save visit");
+      if (res?.serverError || res?.validationErrors) {
+        throw new Error(res.serverError || "Failed to save visit due to validation errors");
       }
       router.refresh();
       setPricePaid("");

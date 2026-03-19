@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { getMeAction, updateUsernameAction } from "@/app/actions/user";
 import { Loader2 } from "lucide-react";
 
 function SetUsernameForm() {
@@ -15,18 +16,15 @@ function SetUsernameForm() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    fetch("/api/user/me")
-      .then((r) => {
-        if (r.status === 401) {
+    getMeAction()
+      .then((res) => {
+        if (res?.serverError === "Unauthorized") {
           router.replace(
             `/login?next=${encodeURIComponent(`/profile/set-username${next !== "/" ? `?next=${encodeURIComponent(next)}` : ""}`)}`,
           );
           return null;
         }
-        return r.json();
-      })
-      .then((json) => {
-        if (json?.data?.username) {
+        if (res?.data?.username) {
           const safeNext =
             next.startsWith("/") && !next.includes("//") ? next : "/";
           router.replace(safeNext);
@@ -47,14 +45,10 @@ function SetUsernameForm() {
     }
     setLoading(true);
     try {
-      const res = await fetch("/api/user/me", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: trimmed }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Failed to set username");
+      const res = await updateUsernameAction({ username: trimmed });
+      
+      if (res?.serverError || res?.validationErrors) {
+        setError(res?.serverError || "Invalid input format");
         setLoading(false);
         return;
       }
