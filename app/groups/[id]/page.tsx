@@ -37,8 +37,10 @@ export default async function GroupDetailPage({
     restaurantId: gr.restaurantId,
   }));
 
-  // Fetch users and source URLs in parallel
-  const [users, userRestaurants] = await Promise.all([
+  const groupRestaurantIds = group.groupRestaurants.map((gr) => gr.restaurantId);
+
+  // Fetch users, source URLs, and visited set (per-group) in parallel
+  const [users, userRestaurants, visitedRestaurants] = await Promise.all([
     memberIds.length > 0
       ? prisma.user.findMany({
           where: { id: { in: memberIds } },
@@ -54,6 +56,17 @@ export default async function GroupDetailPage({
             })),
           },
           select: { userId: true, restaurantId: true, sourceUrl: true },
+        })
+      : Promise.resolve([]),
+    groupRestaurantIds.length > 0
+      ? prisma.visit.findMany({
+          where: {
+            userId: user.id,
+            groupId: group.id,
+            restaurantId: { in: groupRestaurantIds },
+          },
+          select: { restaurantId: true },
+          distinct: ["restaurantId"],
         })
       : Promise.resolve([]),
   ]);
@@ -79,6 +92,10 @@ export default async function GroupDetailPage({
     ]),
   );
 
+  const visitedRestaurantIdSet = new Set(
+    visitedRestaurants.map((v) => v.restaurantId),
+  );
+
   const groupRestaurantsWithSource = group.groupRestaurants.map((gr) => ({
     id: gr.id,
     restaurantId: gr.restaurantId,
@@ -89,6 +106,7 @@ export default async function GroupDetailPage({
       cuisineTypes: gr.restaurant.cuisineTypes,
       priceRange: gr.restaurant.priceRange,
       ambianceTags: gr.restaurant.ambianceTags,
+      visited: visitedRestaurantIdSet.has(gr.restaurantId),
     },
     sourceUrl: sourceUrlMap.get(`${gr.addedById}:${gr.restaurantId}`) ?? null,
   }));

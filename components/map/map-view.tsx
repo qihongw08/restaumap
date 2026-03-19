@@ -76,6 +76,30 @@ export function MapView({
     string | null
   >(null);
   const [bounds, setBounds] = useState<Bounds | null>(null);
+  const [appliedSpotsBounds, setAppliedSpotsBounds] = useState<Bounds | null>(
+    null,
+  );
+  const [appliedLogBounds, setAppliedLogBounds] = useState<Bounds | null>(null);
+  const [logMarkers, setLogMarkers] =
+    useState<VisitLogMarker[]>(visitLogMarkers);
+
+  useEffect(() => {
+    setLogMarkers(visitLogMarkers);
+  }, [visitLogMarkers]);
+
+  const markersInAppliedBounds = useMemo(() => {
+    if (!appliedSpotsBounds) return markers;
+    const b = appliedSpotsBounds;
+    return markers.filter((m) => {
+      if (m.latitude == null || m.longitude == null) return false;
+      return (
+        m.latitude >= b.south &&
+        m.latitude <= b.north &&
+        m.longitude >= b.west &&
+        m.longitude <= b.east
+      );
+    });
+  }, [markers, appliedSpotsBounds]);
 
   useEffect(() => {
     if (
@@ -177,7 +201,7 @@ export function MapView({
 
   // Group visit log markers by restaurant
   const groupedLogMarkers = useMemo(() => {
-    return visitLogMarkers.reduce<
+    return logMarkers.reduce<
       Record<
         string,
         {
@@ -197,7 +221,45 @@ export function MapView({
       acc[v.restaurantId].markers.push(v);
       return acc;
     }, {});
-  }, [visitLogMarkers]);
+  }, [logMarkers]);
+
+  const canSearchLogsHere =
+    mapMode === "logs" &&
+    bounds &&
+    (!appliedLogBounds ||
+      bounds.south !== appliedLogBounds.south ||
+      bounds.north !== appliedLogBounds.north ||
+      bounds.west !== appliedLogBounds.west ||
+      bounds.east !== appliedLogBounds.east);
+
+  const canSearchSpotsHere =
+    mapMode === "spots" &&
+    bounds &&
+    (!appliedSpotsBounds ||
+      bounds.south !== appliedSpotsBounds.south ||
+      bounds.north !== appliedSpotsBounds.north ||
+      bounds.west !== appliedSpotsBounds.west ||
+      bounds.east !== appliedSpotsBounds.east);
+
+  const handleSearchSpotsHere = useCallback(() => {
+    if (!bounds) return;
+    setAppliedSpotsBounds(bounds);
+  }, [bounds]);
+
+  const handleSearchLogsHere = useCallback(async () => {
+    if (!bounds) return;
+    setAppliedLogBounds(bounds);
+    const params = new URLSearchParams();
+    if (selectedGroupId) params.set("groupId", selectedGroupId);
+    params.set("minLat", bounds.south.toString());
+    params.set("maxLat", bounds.north.toString());
+    params.set("minLng", bounds.west.toString());
+    params.set("maxLng", bounds.east.toString());
+    const res = await fetch(`/api/visits/markers?${params.toString()}`);
+    if (!res.ok) return;
+    const json = (await res.json()) as { data?: VisitLogMarker[] };
+    setLogMarkers(json.data ?? []);
+  }, [bounds, selectedGroupId]);
 
   const handleRestaurantClick = useCallback(
     (id: string) => {
@@ -302,12 +364,26 @@ export function MapView({
                 </button>
               </div>
             )}
+
+            {(canSearchSpotsHere || canSearchLogsHere) && (
+              <button
+                type="button"
+                onClick={
+                  canSearchSpotsHere
+                    ? handleSearchSpotsHere
+                    : handleSearchLogsHere
+                }
+                className="w-full rounded-full border border-border bg-background/95 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground shadow-sm"
+              >
+                Search this area
+              </button>
+            )}
           </div>
         </div>
       )}
 
       <RestaurantMap
-        markers={mapMode === "spots" ? markers : []}
+        markers={mapMode === "spots" ? markersInAppliedBounds : []}
         selectedRestaurantId={selectedRestaurantId}
         onMarkerClick={handleMarkerClick}
         center={mapCenter}
@@ -336,7 +412,7 @@ export function MapView({
             isOpen={sheetOpen}
             onOpenChange={handleSheetOpenChange}
             onRestaurantClick={handleMarkerClick}
-            bounds={bounds}
+            appliedBounds={appliedSpotsBounds}
           />
         )
       ) : (
@@ -356,13 +432,13 @@ function SWRBottomSheet({
   isOpen,
   onOpenChange,
   onRestaurantClick,
-  bounds,
+  appliedBounds,
 }: {
   highlightedRestaurantId: string | null;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onRestaurantClick: (id: string) => void;
-  bounds: Bounds | null;
+  appliedBounds: Bounds | null;
 }) {
   const [category, setCategory] = useState("All");
   const [priceRange, setPriceRange] = useState<string | null>(null);
@@ -375,23 +451,18 @@ function SWRBottomSheet({
   );
   const cuisines = cuisinesData?.data ?? [];
 
-  const [appliedBounds, setAppliedBounds] = useState<Bounds | null>(null);
-
-  const buildUrl = useCallback(
-    () => {
-      const params = new URLSearchParams({ limit: "20" });
-      if (category !== "All") params.set("cuisine", category);
-      if (priceRange) params.set("priceRange", priceRange);
-      if (appliedBounds) {
-        params.set("minLat", appliedBounds.south.toString());
-        params.set("maxLat", appliedBounds.north.toString());
-        params.set("minLng", appliedBounds.west.toString());
-        params.set("maxLng", appliedBounds.east.toString());
-      }
-      return `/api/restaurants?${params.toString()}`;
-    },
-    [category, priceRange, appliedBounds],
-  );
+  const buildUrl = useCallback(() => {
+    const params = new URLSearchParams({ limit: "20" });
+    if (category !== "All") params.set("cuisine", category);
+    if (priceRange) params.set("priceRange", priceRange);
+    if (appliedBounds) {
+      params.set("minLat", appliedBounds.south.toString());
+      params.set("maxLat", appliedBounds.north.toString());
+      params.set("minLng", appliedBounds.west.toString());
+      params.set("maxLng", appliedBounds.east.toString());
+    }
+    return `/api/restaurants?${params.toString()}`;
+  }, [category, priceRange, appliedBounds]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -414,15 +485,6 @@ function SWRBottomSheet({
     };
   }, [buildUrl, isOpen]);
 
-  const canSearchHere =
-    isOpen &&
-    bounds &&
-    (!appliedBounds ||
-      bounds.south !== appliedBounds.south ||
-      bounds.north !== appliedBounds.north ||
-      bounds.west !== appliedBounds.west ||
-      bounds.east !== appliedBounds.east);
-
   return (
     <>
       <NearbyBottomSheet
@@ -437,17 +499,6 @@ function SWRBottomSheet({
         onPriceRangeChange={setPriceRange}
         cuisines={cuisines}
       />
-      {isOpen && canSearchHere && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-36 z-[65] flex justify-center">
-          <button
-            type="button"
-            onClick={() => setAppliedBounds(bounds)}
-            className="pointer-events-auto rounded-full bg-background/95 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground shadow-md border border-border"
-          >
-            Search this area
-          </button>
-        </div>
-      )}
     </>
   );
 }

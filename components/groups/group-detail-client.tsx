@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -39,6 +39,7 @@ type Restaurant = {
   cuisineTypes: string[];
   priceRange: string | null;
   ambianceTags: string[];
+  visited?: boolean;
 };
 type GroupRestaurant = {
   id: string;
@@ -66,10 +67,22 @@ export function GroupDetailClient({ group }: { group: GroupDetailData }) {
 
   const isOwner = group.currentMember?.role === "owner";
 
+  const sortedGroupRestaurants = useMemo(() => {
+    const items = [...group.groupRestaurants];
+    items.sort((a, b) => {
+      const aVisited = a.restaurant.visited ? 1 : 0;
+      const bVisited = b.restaurant.visited ? 1 : 0;
+      return aVisited - bVisited;
+    });
+    return items;
+  }, [group.groupRestaurants]);
+
   const handleCreateInvite = async () => {
     setInviteLoading(true);
     try {
-      const res = await fetch(`/api/groups/${group.id}/invites`, { method: "POST" });
+      const res = await fetch(`/api/groups/${group.id}/invites`, {
+        method: "POST",
+      });
       if (!res.ok) throw new Error("Failed to create invite");
       const json = await res.json();
       const base = typeof window !== "undefined" ? window.location.origin : "";
@@ -91,9 +104,12 @@ export function GroupDetailClient({ group }: { group: GroupDetailData }) {
   const handleRemoveRestaurant = async (restaurantId: string) => {
     if (!confirm("Remove this restaurant from the group?")) return;
     try {
-      const res = await fetch(`/api/groups/${group.id}/restaurants/${restaurantId}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `/api/groups/${group.id}/restaurants/${restaurantId}`,
+        {
+          method: "DELETE",
+        },
+      );
       if (!res.ok) throw new Error("Failed to remove");
       router.refresh();
     } catch {
@@ -128,14 +144,25 @@ export function GroupDetailClient({ group }: { group: GroupDetailData }) {
         {isOwner && (
           <div className="mt-4">
             {inviteUrl ? (
-              <div className={`flex items-center gap-2 rounded-xl border-2 px-3 py-2 transition-all ${copySuccess ? "border-primary bg-primary/10 ring-2 ring-primary/30" : "border-border bg-background/60"}`}>
+              <div
+                className={`flex items-center gap-2 rounded-xl border-2 px-3 py-2 transition-all ${copySuccess ? "border-primary bg-primary/10 ring-2 ring-primary/30" : "border-border bg-background/60"}`}
+              >
                 <input
                   readOnly
                   value={inviteUrl}
                   className="min-w-0 flex-1 bg-transparent text-xs text-foreground outline-none"
                 />
-                <Button size="sm" variant={copySuccess ? "primary" : "secondary"} onClick={handleCopyInvite} className="shrink-0">
-                  {copySuccess ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                <Button
+                  size="sm"
+                  variant={copySuccess ? "primary" : "secondary"}
+                  onClick={handleCopyInvite}
+                  className="shrink-0"
+                >
+                  {copySuccess ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
                 </Button>
               </div>
             ) : (
@@ -163,7 +190,10 @@ export function GroupDetailClient({ group }: { group: GroupDetailData }) {
         <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground mb-3">
           Members
         </h2>
-        <MembersList members={group.members} currentUserId={group.currentUserId} />
+        <MembersList
+          members={group.members}
+          currentUserId={group.currentUserId}
+        />
       </div>
 
       <button
@@ -190,7 +220,7 @@ export function GroupDetailClient({ group }: { group: GroupDetailData }) {
               >
                 {(m.user?.username ?? "?")[0].toUpperCase()}
               </div>
-            )
+            ),
           )}
         </div>
         <span className="flex-1 text-left text-sm font-black uppercase tracking-widest text-muted-foreground">
@@ -199,145 +229,185 @@ export function GroupDetailClient({ group }: { group: GroupDetailData }) {
         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
       </button>
 
-      <Modal open={membersOpen} onClose={() => setMembersOpen(false)} title="Members">
-        <MembersList members={group.members} currentUserId={group.currentUserId} />
+      <Modal
+        open={membersOpen}
+        onClose={() => setMembersOpen(false)}
+        title="Members"
+      >
+        <MembersList
+          members={group.members}
+          currentUserId={group.currentUserId}
+        />
       </Modal>
 
       <div className="mb-6 space-y-3">
-            <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground">
-              Restaurants
-            </h2>
-            <div className="grid grid-cols-2 gap-2">
-              <ShareLinkButton
-                endpoint={`/api/share/group/${group.id}`}
-                label="Share"
-                className="w-full justify-center rounded-xl border border-black/15 bg-white px-3 py-2 text-xs shadow-sm"
-              />
-              <Link
-                href={`/map?groupId=${group.id}`}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-black/15 bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-foreground shadow-sm"
-              >
-                <Map className="h-3.5 w-3.5" />
-                Open map
-              </Link>
-            </div>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => setAddRestaurantOpen(true)}
-              className="w-full gap-2 rounded-xl py-2.5 text-xs font-black uppercase tracking-widest"
-            >
-              <Plus className="h-4 w-4" /> Add restaurant
-            </Button>
-          </div>
+        <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground">
+          Restaurants
+        </h2>
+        <div className="grid grid-cols-2 gap-2">
+          <ShareLinkButton
+            endpoint={`/api/share/group/${group.id}`}
+            label="Share"
+            className="w-full justify-center rounded-xl border border-black/15 bg-white px-3 py-2 text-xs shadow-sm"
+          />
+          <Link
+            href={`/map?groupId=${group.id}`}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-black/15 bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-foreground shadow-sm"
+          >
+            <Map className="h-3.5 w-3.5" />
+            Open map
+          </Link>
+        </div>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => setAddRestaurantOpen(true)}
+          className="w-full gap-2 rounded-xl py-2.5 text-xs font-black uppercase tracking-widest"
+        >
+          <Plus className="h-4 w-4" /> Add restaurant
+        </Button>
+      </div>
 
-          {group.groupRestaurants.length === 0 ? (
-            <div className="rounded-2xl border-2 border-dashed border-muted bg-muted/20 p-8 text-center">
-              <p className="text-sm font-bold text-muted-foreground">No restaurants yet</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Add restaurants from your list to share with the group.
-              </p>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="mt-4"
-                onClick={() => setAddRestaurantOpen(true)}
-              >
-                Add restaurant
-              </Button>
-            </div>
-          ) : (
-            <ul className="space-y-3">
-              {group.groupRestaurants.map((gr) => {
-                const r = gr.restaurant;
-                const cuisines = r.cuisineTypes?.length > 0 ? r.cuisineTypes.slice(0, 3).join(", ") : null;
-                const ambience = r.ambianceTags?.length > 0 ? r.ambianceTags.slice(0, 3).join(" · ") : null;
-                const hasMeta = cuisines || r.priceRange || ambience;
-                return (
-                  <li key={gr.id}>
-                    <div className="flex items-start gap-3 rounded-2xl border border-black/10 bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
-                      <Link href={`/restaurants/${r.id}`} className="min-w-0 flex-1">
-                        <p className="font-bold text-foreground truncate">{r.name}</p>
-                        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
-                          {r.formattedAddress && (
-                            <span className="truncate text-muted-foreground">{r.formattedAddress}</span>
-                          )}
-                          {r.formattedAddress && (hasMeta || gr.sourceUrl) && (
+      {group.groupRestaurants.length === 0 ? (
+        <div className="rounded-2xl border-2 border-dashed border-muted bg-muted/20 p-8 text-center">
+          <p className="text-sm font-bold text-muted-foreground">
+            No restaurants yet
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Add restaurants from your list to share with the group.
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="mt-4"
+            onClick={() => setAddRestaurantOpen(true)}
+          >
+            Add restaurant
+          </Button>
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {sortedGroupRestaurants.map((gr) => {
+            const r = gr.restaurant;
+            const cuisines =
+              r.cuisineTypes?.length > 0
+                ? r.cuisineTypes.slice(0, 3).join(", ")
+                : null;
+            const ambience =
+              r.ambianceTags?.length > 0
+                ? r.ambianceTags.slice(0, 3).join(" · ")
+                : null;
+            const hasMeta = cuisines || r.priceRange || ambience;
+            return (
+              <li key={gr.id}>
+                <div className="flex items-start gap-3 rounded-2xl border border-black/10 bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+                  <Link
+                    href={`/restaurants/${r.id}`}
+                    className="min-w-0 flex-1"
+                  >
+                    <p className="font-bold text-foreground truncate">
+                      {r.name}
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
+                      {r.visited && (
+                        <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 font-medium text-emerald-700 dark:text-emerald-400">
+                          Visited
+                        </span>
+                      )}
+                      {r.formattedAddress && (
+                        <span className="truncate text-muted-foreground">
+                          {r.formattedAddress}
+                        </span>
+                      )}
+                      {r.formattedAddress && (hasMeta || gr.sourceUrl) && (
+                        <span className="text-muted-foreground/60">·</span>
+                      )}
+                      {cuisines && (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-primary/15 px-2 py-0.5 font-medium text-primary">
+                          <UtensilsCrossed className="h-3 w-3" />
+                          {cuisines}
+                        </span>
+                      )}
+                      {r.priceRange && (
+                        <span className="rounded-md bg-amber-500/15 px-2 py-0.5 font-medium text-amber-700 dark:text-amber-400">
+                          {r.priceRange}
+                        </span>
+                      )}
+                      {ambience && (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-muted/80 px-2 py-0.5 text-muted-foreground">
+                          <Sparkles className="h-3 w-3" />
+                          {ambience}
+                        </span>
+                      )}
+                      {gr.sourceUrl && (
+                        <>
+                          {(hasMeta || r.formattedAddress) && (
                             <span className="text-muted-foreground/60">·</span>
                           )}
-                          {cuisines && (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-primary/15 px-2 py-0.5 font-medium text-primary">
-                              <UtensilsCrossed className="h-3 w-3" />
-                              {cuisines}
-                            </span>
-                          )}
-                          {r.priceRange && (
-                            <span className="rounded-md bg-amber-500/15 px-2 py-0.5 font-medium text-amber-700 dark:text-amber-400">
-                              {r.priceRange}
-                            </span>
-                          )}
-                          {ambience && (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-muted/80 px-2 py-0.5 text-muted-foreground">
-                              <Sparkles className="h-3 w-3" />
-                              {ambience}
-                            </span>
-                          )}
-                          {gr.sourceUrl && (
-                            <>
-                              {(hasMeta || r.formattedAddress) && (
-                                <span className="text-muted-foreground/60">·</span>
-                              )}
-                              <button
-                                type="button"
-                                role="link"
-                                className="inline-flex items-center gap-1 truncate font-medium text-primary hover:underline text-left"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  window.open(gr.sourceUrl!, "_blank", "noopener,noreferrer");
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter" || e.key === " ") {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    window.open(gr.sourceUrl!, "_blank", "noopener,noreferrer");
-                                  }
-                                }}
-                              >
-                                <ExternalLink className="h-3 w-3 shrink-0" />
-                                {(() => {
-                                  try {
-                                    return new URL(gr.sourceUrl!).hostname.replace(/^www\./, "");
-                                  } catch {
-                                    return "Source";
-                                  }
-                                })()}
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </Link>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="shrink-0 size-9 p-0 text-muted-foreground hover:text-destructive"
-                        onClick={() => handleRemoveRestaurant(gr.restaurantId)}
-                        aria-label="Remove from group"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                          <button
+                            type="button"
+                            role="link"
+                            className="inline-flex items-center gap-1 truncate font-medium text-primary hover:underline text-left"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              window.open(
+                                gr.sourceUrl!,
+                                "_blank",
+                                "noopener,noreferrer",
+                              );
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                window.open(
+                                  gr.sourceUrl!,
+                                  "_blank",
+                                  "noopener,noreferrer",
+                                );
+                              }
+                            }}
+                          >
+                            <ExternalLink className="h-3 w-3 shrink-0" />
+                            {(() => {
+                              try {
+                                return new URL(gr.sourceUrl!).hostname.replace(
+                                  /^www\./,
+                                  "",
+                                );
+                              } catch {
+                                return "Source";
+                              }
+                            })()}
+                          </button>
+                        </>
+                      )}
                     </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+                  </Link>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="shrink-0 size-9 p-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => handleRemoveRestaurant(gr.restaurantId)}
+                    aria-label="Remove from group"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
       <AddRestaurantModal
         open={addRestaurantOpen}
         onClose={() => setAddRestaurantOpen(false)}
         groupId={group.id}
-        existingRestaurantIds={group.groupRestaurants.map((gr) => gr.restaurantId)}
+        existingRestaurantIds={group.groupRestaurants.map(
+          (gr) => gr.restaurantId,
+        )}
         onAdded={() => router.refresh()}
       />
     </main>
@@ -357,7 +427,8 @@ function MembersList({
   return (
     <ul className="space-y-2">
       {sorted.map((m) => {
-        const displayName = m.userId === currentUserId ? "You" : (m.user?.username ?? "Member");
+        const displayName =
+          m.userId === currentUserId ? "You" : (m.user?.username ?? "Member");
         const avatarUrl = m.user?.avatarUrl;
         return (
           <li
@@ -381,7 +452,9 @@ function MembersList({
                   <Users className="h-4 w-4" />
                 </div>
               )}
-              <span className="truncate text-sm font-medium text-foreground">{displayName}</span>
+              <span className="truncate text-sm font-medium text-foreground">
+                {displayName}
+              </span>
             </div>
             <span
               className={`shrink-0 text-xs font-bold uppercase tracking-wider ${
@@ -410,7 +483,9 @@ function AddRestaurantModal({
   existingRestaurantIds: string[];
   onAdded: () => void;
 }) {
-  const [restaurants, setRestaurants] = useState<{ id: string; name: string }[]>([]);
+  const [restaurants, setRestaurants] = useState<
+    { id: string; name: string }[]
+  >([]);
   const [loading, setLoading] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
 
@@ -427,7 +502,9 @@ function AddRestaurantModal({
     }
   }
 
-  const available = restaurants.filter((r) => !existingRestaurantIds.includes(r.id));
+  const available = restaurants.filter(
+    (r) => !existingRestaurantIds.includes(r.id),
+  );
 
   const handleAdd = async (restaurantId: string) => {
     setAddingId(restaurantId);
