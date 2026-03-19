@@ -413,6 +413,7 @@ export function MapView({
             onOpenChange={handleSheetOpenChange}
             onRestaurantClick={handleMarkerClick}
             appliedBounds={appliedSpotsBounds}
+            groupId={selectedGroupId}
           />
         )
       ) : (
@@ -433,12 +434,14 @@ function SWRBottomSheet({
   onOpenChange,
   onRestaurantClick,
   appliedBounds,
+  groupId,
 }: {
   highlightedRestaurantId: string | null;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onRestaurantClick: (id: string) => void;
   appliedBounds: Bounds | null;
+  groupId: string | null;
 }) {
   const [category, setCategory] = useState("All");
   const [priceRange, setPriceRange] = useState<string | null>(null);
@@ -453,6 +456,7 @@ function SWRBottomSheet({
 
   const buildUrl = useCallback(() => {
     const params = new URLSearchParams({ limit: "20" });
+    if (groupId) params.set("groupId", groupId);
     if (category !== "All") params.set("cuisine", category);
     if (priceRange) params.set("priceRange", priceRange);
     if (appliedBounds) {
@@ -462,7 +466,7 @@ function SWRBottomSheet({
       params.set("maxLng", appliedBounds.east.toString());
     }
     return `/api/restaurants?${params.toString()}`;
-  }, [category, priceRange, appliedBounds]);
+  }, [groupId, category, priceRange, appliedBounds]);
 
   useEffect(() => {
     if (!isOpen) return;
