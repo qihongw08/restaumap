@@ -83,12 +83,13 @@ model Group {
 }
 
 model GroupMember {
-  id       String   @id @default(uuid())
-  groupId  String   @map("group_id")
-  userId   String   @map("user_id")
-  role     String   @default("member")
-  joinedAt DateTime @default(now()) @map("joined_at")
-  group    Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  id        String   @id @default(uuid())
+  groupId   String   @map("group_id")
+  userId    String   @map("user_id")
+  role      String   @default("member")
+  sortOrder Int      @default(0) @map("sort_order")
+  joinedAt  DateTime @default(now()) @map("joined_at")
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@unique([groupId, userId])
   @@map("group_members")

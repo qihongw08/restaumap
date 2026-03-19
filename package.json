@@ -15,6 +15,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1007.0",
     "@aws-sdk/s3-request-presigner": "^3.1007.0",
+    "@hello-pangea/dnd": "^18.0.1",
     "@prisma/adapter-pg": "^7.4.0",
     "@prisma/client": "^7.4.0",
     "@supabase/ssr": "^0.8.0",

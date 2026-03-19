@@ -12,15 +12,19 @@ export default async function Home() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const [dbUser, groups, recentVisits, recentRestaurants] = await Promise.all([
+  const [dbUser, userGroups, recentVisits, recentRestaurants] = await Promise.all([
     getDbUser(user.id),
-    prisma.group.findMany({
-      where: { members: { some: { userId: user.id } } },
+    prisma.groupMember.findMany({
+      where: { userId: user.id },
+      orderBy: { sortOrder: "asc" },
       include: {
-        _count: { select: { members: true, groupRestaurants: true } },
-        members: { take: 4 },
+        group: {
+          include: {
+            _count: { select: { members: true, groupRestaurants: true } },
+            members: { take: 4 },
+          },
+        },
       },
-      orderBy: { updatedAt: "desc" },
     }),
     prisma.visit.findMany({
       where: { userId: user.id },
@@ -43,6 +47,8 @@ export default async function Home() {
       },
     }),
   ]);
+
+  const groups = userGroups.map((g) => g.group);
 
   // Fetch member avatars for group cards
   const allMemberIds = [
