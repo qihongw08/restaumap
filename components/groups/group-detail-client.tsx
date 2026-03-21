@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -55,6 +55,10 @@ type GroupRestaurant = {
   restaurantId: string;
   restaurant: Restaurant;
   sourceUrl?: string | null;
+  addedBy?: {
+    username: string | null;
+    avatarUrl: string | null;
+  } | null;
 };
 export type GroupDetailData = {
   id: string;
@@ -307,86 +311,107 @@ export function GroupDetailClient({ group }: { group: GroupDetailData }) {
                     href={`/restaurants/${r.id}`}
                     className="min-w-0 flex-1"
                   >
-                    <p className="font-bold text-foreground truncate">
-                      {r.name}
-                    </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
-                      {r.visited && (
-                        <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 font-medium text-emerald-700 dark:text-emerald-400">
-                          Visited
-                        </span>
-                      )}
-                      {r.formattedAddress && (
-                        <span className="truncate text-muted-foreground">
-                          {r.formattedAddress}
-                        </span>
-                      )}
-                      {r.formattedAddress && (hasMeta || gr.sourceUrl) && (
-                        <span className="text-muted-foreground/60">·</span>
-                      )}
-                      {cuisines && (
-                        <span className="inline-flex items-center gap-1 rounded-md bg-primary/15 px-2 py-0.5 font-medium text-primary">
-                          <UtensilsCrossed className="h-3 w-3" />
-                          {cuisines}
-                        </span>
-                      )}
-                      {r.priceRange && (
-                        <span className="rounded-md bg-amber-500/15 px-2 py-0.5 font-medium text-amber-700 dark:text-amber-400">
-                          {r.priceRange}
-                        </span>
-                      )}
-                      {ambience && (
-                        <span className="inline-flex items-center gap-1 rounded-md bg-muted/80 px-2 py-0.5 text-muted-foreground">
-                          <Sparkles className="h-3 w-3" />
-                          {ambience}
-                        </span>
-                      )}
-                      {gr.sourceUrl && (
-                        <>
-                          {(hasMeta || r.formattedAddress) && (
-                            <span className="text-muted-foreground/60">·</span>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-foreground truncate">
+                          {r.name}
+                        </p>
+                      </div>
+                      {gr.addedBy && (
+                        <div className="shrink-0 mt-0.5">
+                          {gr.addedBy.avatarUrl ? (
+                            <Image
+                              src={gr.addedBy.avatarUrl}
+                              alt={gr.addedBy.username ?? "User"}
+                              width={32}
+                              height={32}
+                              className="h-8 w-8 rounded-full border-2 border-primary/20 object-cover shadow-sm"
+                            />
+                          ) : (
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-primary/20 bg-muted text-[10px] font-black text-muted-foreground uppercase shadow-sm">
+                              {(gr.addedBy.username ?? "?")[0]}
+                            </div>
                           )}
-                          <button
-                            type="button"
-                            role="link"
-                            className="inline-flex items-center gap-1 truncate font-medium text-primary hover:underline text-left"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              window.open(
-                                gr.sourceUrl!,
-                                "_blank",
-                                "noopener,noreferrer",
-                              );
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                window.open(
-                                  gr.sourceUrl!,
-                                  "_blank",
-                                  "noopener,noreferrer",
-                                );
-                              }
-                            }}
-                          >
-                            <ExternalLink className="h-3 w-3 shrink-0" />
-                            {(() => {
-                              try {
-                                return new URL(gr.sourceUrl!).hostname.replace(
-                                  /^www\./,
-                                  "",
-                                );
-                              } catch {
-                                return "Source";
-                              }
-                            })()}
-                          </button>
-                        </>
+                        </div>
                       )}
                     </div>
-                  </Link>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
+                          {r.visited && (
+                            <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 font-medium text-emerald-700 dark:text-emerald-400">
+                              Visited
+                            </span>
+                          )}
+                          {r.formattedAddress && (
+                            <span className="truncate text-muted-foreground">
+                              {r.formattedAddress}
+                            </span>
+                          )}
+                          {r.formattedAddress && (hasMeta || gr.sourceUrl) && (
+                            <span className="text-muted-foreground/60">·</span>
+                          )}
+                          {cuisines && (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-primary/15 px-2 py-0.5 font-medium text-primary">
+                              <UtensilsCrossed className="h-3 w-3" />
+                              {cuisines}
+                            </span>
+                          )}
+                          {r.priceRange && (
+                            <span className="rounded-md bg-amber-500/15 px-2 py-0.5 font-medium text-amber-700 dark:text-amber-400">
+                              {r.priceRange}
+                            </span>
+                          )}
+                          {ambience && (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-muted/80 px-2 py-0.5 text-muted-foreground">
+                              <Sparkles className="h-3 w-3" />
+                              {ambience}
+                            </span>
+                          )}
+                          {gr.sourceUrl && (
+                            <>
+                              {(hasMeta || r.formattedAddress) && (
+                                <span className="text-muted-foreground/60">·</span>
+                              )}
+                              <button
+                                type="button"
+                                role="link"
+                                className="inline-flex items-center gap-1 truncate font-medium text-primary hover:underline text-left"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  window.open(
+                                    gr.sourceUrl!,
+                                    "_blank",
+                                    "noopener,noreferrer",
+                                  );
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    window.open(
+                                      gr.sourceUrl!,
+                                      "_blank",
+                                      "noopener,noreferrer",
+                                    );
+                                  }
+                                }}
+                              >
+                                <ExternalLink className="h-3 w-3 shrink-0" />
+                                {(() => {
+                                  try {
+                                    return new URL(gr.sourceUrl!).hostname.replace(
+                                      /^www\./,
+                                      "",
+                                    );
+                                  } catch {
+                                    return "Source";
+                                  }
+                                })()}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                    </Link>
                   <Button
                     size="sm"
                     variant="ghost"
@@ -520,9 +545,7 @@ function AddRestaurantModal({
   const [loading, setLoading] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
 
-  const [prevOpen, setPrevOpen] = useState(false);
-  if (open !== prevOpen) {
-    setPrevOpen(open);
+  useEffect(() => {
     if (open) {
       setLoading(true);
       getRestaurantsAction({})
@@ -534,7 +557,7 @@ function AddRestaurantModal({
         .catch(() => setRestaurants([]))
         .finally(() => setLoading(false));
     }
-  }
+  }, [open]);
 
   const available = restaurants.filter(
     (r) => !existingRestaurantIds.includes(r.id),

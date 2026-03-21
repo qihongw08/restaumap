@@ -40,6 +40,8 @@ export const getVisitsAction = authActionClient
         restaurant: { select: { id: true, name: true, latitude: true, longitude: true } },
         photos: { select: { id: true, url: true } },
         group: { select: { id: true, name: true } },
+        user: { select: { username: true, avatarUrl: true } },
+        attendees: { include: { user: { select: { username: true, avatarUrl: true } } } },
       },
     });
 
@@ -56,8 +58,19 @@ export const getVisitsAction = authActionClient
       pricePaid: Number(v.pricePaid),
       notes: v.notes,
       photos: v.photos,
+      creator: {
+        username: v.user.username,
+        avatarUrl: v.user.avatarUrl,
+      },
       restaurant: v.restaurant,
       group: v.group ? { id: v.group.id, name: v.group.name } : null,
+      attendees: v.attendees.map(a => ({
+        userId: a.userId,
+        user: {
+          username: a.user.username,
+          avatarUrl: a.user.avatarUrl,
+        }
+      })),
     }));
 
     const nextCursor = hasMore ? page[page.length - 1].id : null;
@@ -73,6 +86,7 @@ const createVisitSchema = z.object({
   notes: z.string().optional().nullable(),
   groupId: z.string().optional().nullable(),
   photoUrls: z.array(z.string()).optional(),
+  attendeeIds: z.array(z.string()).optional(),
 });
 
 export const createVisitAction = authMutationClient
@@ -105,6 +119,9 @@ export const createVisitAction = authMutationClient
           tasteScore,
           pricePaid,
           notes: notes ?? null,
+          attendees: {
+            create: (parsedInput.attendeeIds ?? []).map(userId => ({ userId }))
+          }
         },
       });
       
@@ -140,12 +157,13 @@ const updateVisitSchema = z.object({
   tasteScore: z.number().min(1).max(10).optional(),
   pricePaid: z.number().min(0).optional(),
   notes: z.string().optional().nullable(),
+  attendeeIds: z.array(z.string()).optional(),
 });
 
 export const updateVisitAction = authMutationClient
   .inputSchema(updateVisitSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const { id, visitDate, fullnessScore, tasteScore, pricePaid, notes } = parsedInput;
+    const { id, visitDate, fullnessScore, tasteScore, pricePaid, notes, attendeeIds } = parsedInput;
 
     const visit = await prisma.visit.findUnique({ where: { id } });
     if (!visit || visit.userId !== ctx.user.id) throw new Error('Visit not found');
@@ -158,11 +176,17 @@ export const updateVisitAction = authMutationClient
     if (tasteScore !== undefined) data.tasteScore = tasteScore;
     if (pricePaid !== undefined) data.pricePaid = pricePaid;
     if (notes !== undefined) data.notes = notes || null;
+    if (attendeeIds !== undefined) {
+      data.attendees = {
+        deleteMany: {},
+        create: attendeeIds.map(userId => ({ userId }))
+      };
+    }
 
     const updated = await prisma.visit.update({
       where: { id },
       data,
-      include: { photos: true },
+      include: { photos: true, attendees: true },
     });
 
     revalidatePath(`/restaurants/${updated.restaurantId}`);

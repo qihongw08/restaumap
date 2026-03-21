@@ -20,7 +20,10 @@ export default async function GroupDetailPage({
     include: {
       members: true,
       groupRestaurants: {
-        include: { restaurant: true },
+        include: {
+          restaurant: true,
+          addedBy: { select: { username: true, avatarUrl: true } },
+        },
         orderBy: { addedAt: "desc" },
       },
     },
@@ -109,6 +112,12 @@ export default async function GroupDetailPage({
       visited: visitedRestaurantIdSet.has(gr.restaurantId),
     },
     sourceUrl: sourceUrlMap.get(`${gr.addedById}:${gr.restaurantId}`) ?? null,
+    addedBy: gr.addedBy
+      ? {
+          username: gr.addedBy.username,
+          avatarUrl: gr.addedBy.avatarUrl,
+        }
+      : null,
   }));
 
   const groupData = {

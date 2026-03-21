@@ -121,7 +121,12 @@ export const getGroupAction = authActionClient
       include: {
         members: true,
         groupRestaurants: {
-          include: { restaurant: true },
+          include: {
+            restaurant: true,
+            addedBy: {
+              select: { username: true, avatarUrl: true },
+            },
+          },
           orderBy: { addedAt: "desc" },
         },
       },
@@ -191,7 +196,14 @@ export const updateGroupAction = authMutationClient
       data: { name },
       include: {
         members: true,
-        groupRestaurants: { include: { restaurant: true } },
+        groupRestaurants: {
+          include: {
+            restaurant: true,
+            addedBy: {
+              select: { username: true, avatarUrl: true },
+            },
+          },
+        },
       },
     });
     return group;

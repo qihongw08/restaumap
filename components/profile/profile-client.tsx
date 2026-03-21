@@ -7,10 +7,12 @@ import { getVisitsAction } from "@/app/actions/visits";
 
 interface ProfileClientProps {
   visits: VisitLogData[];
+  username: string;
+  avatarUrl?: string;
   initialCursor?: string | null;
 }
 
-export function ProfileClient({ visits: initialVisits, initialCursor = null }: ProfileClientProps) {
+export function ProfileClient({ visits: initialVisits, username, avatarUrl, initialCursor = null }: ProfileClientProps) {
   const [view, setView] = useState<"timeline" | "by-restaurant">("timeline");
   const [visits, setVisits] = useState(initialVisits);
   const [cursor, setCursor] = useState<string | null>(initialCursor);
@@ -96,7 +98,7 @@ export function ProfileClient({ visits: initialVisits, initialCursor = null }: P
         <ul className="space-y-4">
           {visits.map((v) => (
             <li key={v.id}>
-              <VisitLogCard visit={v} editable />
+              <VisitLogCard visit={v} editable displayName={username} avatarUrl={avatarUrl} />
             </li>
           ))}
         </ul>
@@ -116,6 +118,8 @@ export function ProfileClient({ visits: initialVisits, initialCursor = null }: P
                     <VisitLogCard
                       visit={v}
                       editable
+                      displayName={username}
+                      avatarUrl={avatarUrl}
                       showRestaurantName={false}
                     />
                   </li>

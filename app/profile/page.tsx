@@ -36,6 +36,7 @@ export default async function ProfilePage() {
         restaurant: { select: { id: true, name: true } },
         photos: { select: { id: true, url: true } },
         group: { select: { id: true, name: true } },
+        attendees: { include: { user: { select: { username: true, avatarUrl: true } } } },
       },
     }),
   ]);
@@ -62,6 +63,13 @@ export default async function ProfilePage() {
     photos: v.photos,
     restaurant: v.restaurant,
     group: v.group ? { id: v.group.id, name: v.group.name } : null,
+    attendees: v.attendees.map(a => ({
+      userId: a.userId,
+      user: {
+        username: a.user.username,
+        avatarUrl: a.user.avatarUrl,
+      }
+    })),
   }));
 
   return (
@@ -75,7 +83,12 @@ export default async function ProfilePage() {
           uniqueRestaurants={uniqueRestaurants}
           bestPF={bestPF}
         />
-        <ProfileClient visits={serializedVisits} initialCursor={initialCursor} />
+        <ProfileClient
+          visits={serializedVisits}
+          username={dbUser.username}
+          avatarUrl={dbUser.avatarUrl ?? undefined}
+          initialCursor={initialCursor}
+        />
       </main>
       <Nav />
     </div>

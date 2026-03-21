@@ -21,6 +21,10 @@ export type RestaurantWithVisits = Omit<
   status: RestaurantStatus;
   isBlacklisted?: boolean;
   sourceUrl?: string | null;
+  addedBy?: {
+    username: string | null;
+    avatarUrl: string | null;
+  } | null;
 };
 
 export type RestaurantWithDetails = Restaurant & {
@@ -34,6 +38,10 @@ export type RestaurantWithDetails = Restaurant & {
   savedAt?: string | Date;
   status: RestaurantStatus;
   isBlacklisted?: boolean;
+  addedBy?: {
+    username: string | null;
+    avatarUrl: string | null;
+  } | null;
 };
 
 /** Lightweight marker data for map rendering — no photos, visits, or heavy fields */

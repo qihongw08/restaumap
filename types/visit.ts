@@ -8,6 +8,13 @@ export type VisitWithPhotos = Omit<Visit, "visitDate" | "createdAt" | "updatedAt
   updatedAt: Date | string;
   photos?: (Omit<Pick<Photo, "id" | "url" | "uploadedAt">, "uploadedAt"> & { uploadedAt: Date | string })[];
   group?: { id: string; name: string } | null;
+  attendees?: {
+    userId: string;
+    user: {
+      username: string | null;
+      avatarUrl: string | null;
+    };
+  }[];
 };
 
 export interface VisitLogWithLocation {
@@ -20,7 +27,15 @@ export interface VisitLogWithLocation {
   pricePaid: number;
   notes: string | null;
   photos: { id: string; url: string }[];
+  creator?: { username: string | null; avatarUrl: string | null };
   restaurant: { id: string; name: string; latitude: number; longitude: number };
+  attendees?: {
+    userId: string;
+    user: {
+      username: string | null;
+      avatarUrl: string | null;
+    };
+  }[];
 }
 
 /** Lightweight visit log marker for map rendering */
@@ -41,4 +56,5 @@ export interface VisitFormData {
   notes?: string;
   groupId?: string;
   photoUrls?: string[];
+  attendeeIds?: string[];
 }

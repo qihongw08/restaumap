@@ -7,12 +7,16 @@ datasource db {
 }
 
 model User {
-  id        String   @id
-  username  String?  @map("username")
-  email     String?  @map("email")
-  avatarUrl String?  @map("avatar_url")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id              String            @id
+  username        String?           @map("username")
+  email           String?           @map("email")
+  avatarUrl       String?           @map("avatar_url")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  userRestaurants UserRestaurant[]
+  addedRestaurants GroupRestaurant[] @relation("AddedBy")
+  visitAttendees   VisitAttendee[]
+  visits           Visit[]
 
   @@map("users")
 }
@@ -54,6 +58,7 @@ model UserRestaurant {
   sourcePlatform  String?          @map("source_platform")
   rawCaption      String?          @map("raw_caption")
   restaurant      Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, restaurantId])
   @@map("user_restaurants")
@@ -95,6 +100,7 @@ model GroupRestaurant {
   addedAt      DateTime   @default(now()) @map("added_at")
   group        Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  addedBy      User       @relation("AddedBy", fields: [addedById], references: [id])
 
   @@unique([groupId, restaurantId])
   @@map("group_restaurants")
@@ -141,22 +147,35 @@ model ShareLink {
 }
 
 model Visit {
-  id            String     @id @default(uuid())
-  restaurantId  String     @map("restaurant_id")
-  visitDate     DateTime   @map("visit_date")
-  fullnessScore Int        @map("fullness_score")
-  tasteScore    Int        @map("taste_score")
-  pricePaid     Float      @map("price_paid")
+  id            String          @id @default(uuid())
+  restaurantId  String          @map("restaurant_id")
+  visitDate     DateTime        @map("visit_date")
+  fullnessScore Int             @map("fullness_score")
+  tasteScore    Int             @map("taste_score")
+  pricePaid     Float           @map("price_paid")
   notes         String?
-  createdAt     DateTime   @default(now()) @map("created_at")
-  updatedAt     DateTime   @updatedAt @map("updated_at")
-  userId        String     @map("user_id")
-  groupId       String?    @map("group_id")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  userId        String          @map("user_id")
+  groupId       String?         @map("group_id")
   photos        Photo[]
-  group         Group?     @relation(fields: [groupId], references: [id])
-  restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  group         Group?          @relation(fields: [groupId], references: [id])
+  restaurant    Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  user          User            @relation(fields: [userId], references: [id])
+  attendees     VisitAttendee[]
 
   @@map("visits")
+}
+
+model VisitAttendee {
+  id      String @id @default(uuid())
+  visitId String @map("visit_id")
+  userId  String @map("user_id")
+  visit   Visit  @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([visitId, userId])
+  @@map("visit_attendees")
 }
 
 model Photo {

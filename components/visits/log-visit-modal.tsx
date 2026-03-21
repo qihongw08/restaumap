@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input";
 import { calculatePFRatio, clampScore, cn } from "@/lib/utils";
 import { PF_RATIO_FULLNESS_MAX, PF_RATIO_TASTE_MAX } from "@/lib/constants";
 import { ImageIcon, Plus, X } from "lucide-react";
+import Image from "next/image";
 import { presignUploadsAction } from "@/app/actions/upload";
 import { createVisitAction } from "@/app/actions/visits";
-import { getGroupsAction } from "@/app/actions/groups";
+import { getGroupsAction, getGroupAction } from "@/app/actions/groups";
 
 interface LogVisitModalProps {
   open: boolean;
@@ -32,6 +33,9 @@ export function LogVisitModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [groups, setGroups] = useState<GroupOption[]>([]);
+  const [groupMembers, setGroupMembers] = useState<{ id: string; userId: string; user: { username: string | null; avatarUrl: string | null } }[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [attendeeIds, setAttendeeIds] = useState<string[]>([]);
 
   const [visitDate, setVisitDate] = useState(() => {
     const d = new Date();
@@ -54,6 +58,24 @@ export function LogVisitModal({
       })
       .catch(() => setGroups([]));
   }, [open, restaurantId]);
+
+  useEffect(() => {
+    if (!groupId) {
+      setGroupMembers([]);
+      setAttendeeIds([]);
+      return;
+    }
+    getGroupAction({ id: groupId })
+        .then((res) => {
+          if (res?.data?.members) {
+            setGroupMembers(res.data.members as any);
+            if (res.data.currentUserId) {
+              setCurrentUserId(res.data.currentUserId);
+            }
+          }
+        })
+        .catch(() => setGroupMembers([]));
+  }, [groupId]);
 
   const priceNum = parseFloat(pricePaid);
   const validPrice = Number.isFinite(priceNum) && priceNum > 0;
@@ -123,6 +145,7 @@ export function LogVisitModal({
         notes: notes || undefined,
         groupId: selectedGroupId,
         photoUrls: photoUrls.length > 0 ? photoUrls : undefined,
+        attendeeIds: attendeeIds.length > 0 ? attendeeIds : undefined,
       });
       if (res?.serverError || res?.validationErrors) {
         throw new Error(res.serverError || "Failed to save visit");
@@ -238,27 +261,72 @@ export function LogVisitModal({
         )}
 
         {groups.length > 0 && (
-          <div className="space-y-1">
-            <label
-              htmlFor="visit-group"
-              className="block text-[10px] font-black uppercase tracking-widest text-muted-foreground"
-            >
-              WITH GROUP (OPTIONAL)
-            </label>
-            <select
-              id="visit-group"
-              name="groupId"
-              value={groupId}
-              onChange={(e) => setGroupId(e.target.value)}
-              className="w-full rounded-2xl border-2 border-border bg-background py-3 px-4 text-sm font-bold text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            >
-              <option value="">None</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <label
+                htmlFor="visit-group"
+                className="block text-[10px] font-black uppercase tracking-widest text-muted-foreground"
+              >
+                WITH GROUP (OPTIONAL)
+              </label>
+              <select
+                id="visit-group"
+                name="groupId"
+                value={groupId}
+                onChange={(e) => setGroupId(e.target.value)}
+                className="w-full rounded-2xl border-2 border-border bg-background py-3 px-4 text-sm font-bold text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="">None</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {groupMembers.length > 0 && (
+              <div className="space-y-3 rounded-2xl bg-muted/20 p-4 border border-border/50">
+                <label className="block text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  WHO WAS THERE?
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {groupMembers.filter(m => m.userId !== currentUserId).map((m) => {
+                    const isSelected = attendeeIds.includes(m.userId);
+                    return (
+                      <button
+                        key={m.userId}
+                        type="button"
+                        onClick={() => {
+                          setAttendeeIds(prev => 
+                            isSelected 
+                              ? prev.filter(id => id !== m.userId)
+                              : [...prev, m.userId]
+                          );
+                        }}
+                        className={cn(
+                          "flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-bold transition-all",
+                          isSelected
+                            ? "bg-primary border-primary text-primary-foreground shadow-sm"
+                            : "bg-background border-border text-muted-foreground hover:border-primary/30"
+                        )}
+                      >
+                        {m.user.avatarUrl && (
+                          <Image
+                            src={m.user.avatarUrl}
+                            alt=""
+                            width={16}
+                            height={16}
+                            className="h-4 w-4 rounded-full object-cover"
+                          />
+                        )}
+                        {m.user.username || "Member"}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

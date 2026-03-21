@@ -23,8 +23,16 @@ export interface VisitLogData {
   pricePaid: number;
   notes: string | null;
   photos: { id: string; url: string }[];
+  creator?: { username: string | null; avatarUrl: string | null };
   restaurant: { id: string; name: string };
   group?: { id: string; name: string } | null;
+  attendees?: {
+    userId: string;
+    user: {
+      username: string | null;
+      avatarUrl: string | null;
+    };
+  }[];
 }
 
 interface VisitLogCardProps {
@@ -124,40 +132,71 @@ export function VisitLogCard({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center gap-3 border-t border-black/5 px-4 py-3">
-          {avatarUrl ? (
-            <Image
-              src={avatarUrl}
-              alt=""
-              width={28}
-              height={28}
-              className="size-7 shrink-0 rounded-full object-cover"
-            />
-          ) : displayName ? (
-            <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-black text-muted-foreground">
-              {displayName[0].toUpperCase()}
+        <div className="flex h-14 items-center gap-2 border-t border-black/5 px-4">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="flex shrink-0 items-center">
+              {avatarUrl ? (
+                <Image
+                  src={avatarUrl}
+                  alt=""
+                  width={28}
+                  height={28}
+                  className="size-7 rounded-full object-cover ring-2 ring-white"
+                />
+              ) : displayName ? (
+                <div className="flex size-7 items-center justify-center rounded-full bg-muted text-xs font-black text-muted-foreground uppercase ring-2 ring-white">
+                  {displayName[0]}
+                </div>
+              ) : null}
             </div>
-          ) : null}
-          {displayName && (
-            <p className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-bold text-foreground">
-              {displayName}
-            </p>
-          )}
-          {!displayName && <div className="min-w-0 flex-1" />}
-          <span className="shrink-0 rounded-full bg-primary/15 px-3 py-1 text-sm font-black italic text-primary">
-            {formatPFRatio(pfRatio)}
-          </span>
-          {editable && (
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className="shrink-0 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground"
-              aria-label="Edit visit"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-          )}
+
+            {visit.attendees && visit.attendees.length > 0 && (
+              <div className="flex shrink-0 items-center -space-x-2.5 ml-[-4px]">
+                {visit.attendees.slice(0, 5).map((a, i) => (
+                  <div
+                    key={a.userId}
+                    className="relative ring-2 ring-white rounded-full bg-white shrink-0 overflow-hidden"
+                    style={{ zIndex: 10 - i }}
+                  >
+                    {a.user.avatarUrl ? (
+                      <Image
+                        src={a.user.avatarUrl}
+                        alt={a.user.username || "Attendee"}
+                        width={24}
+                        height={24}
+                        className="size-6 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex size-6 items-center justify-center rounded-full bg-muted text-[8px] font-black text-muted-foreground uppercase">
+                        {(a.user.username?.[0] || "?").toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {visit.attendees.length > 5 && (
+                  <div className="flex size-6 items-center justify-center rounded-full bg-muted text-[8px] font-black text-muted-foreground ring-2 ring-white">
+                    +{visit.attendees.length - 5}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="shrink-0 rounded-full bg-primary/15 px-3 py-1 text-sm font-black italic text-primary">
+              {formatPFRatio(pfRatio)}
+            </span>
+            {editable && (
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="shrink-0 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground"
+                aria-label="Edit visit"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -170,6 +209,7 @@ export function VisitLogCard({
             groupId: visit.group?.id ?? null,
             createdAt: visit.visitDate,
             updatedAt: visit.visitDate,
+            attendees: visit.attendees,
             photos: visit.photos.map((p) => ({
               id: p.id,
               url: p.url,

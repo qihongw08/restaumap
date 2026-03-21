@@ -263,6 +263,11 @@ export const getRestaurantsAction = authActionClient
             take: 5,
             include: { photos: true },
           },
+          groupRestaurants: groupId ? {
+            where: { groupId },
+            include: { addedBy: { select: { username: true, avatarUrl: true } } },
+            take: 1,
+          } : undefined,
         },
       },
     } as any;
@@ -295,6 +300,7 @@ export const getRestaurantsAction = authActionClient
       sourceUrl: ur.sourceUrl,
       sourcePlatform: ur.sourcePlatform,
       rawCaption: ur.rawCaption,
+      addedBy: ur.restaurant.groupRestaurants?.[0]?.addedBy ?? null,
     }));
 
     const nextCursor = hasBounds || !hasMore ? null : items[items.length - 1].id;
@@ -456,21 +462,29 @@ export const deleteRestaurantAction = authMutationClient
   });
 
 export const getRestaurantMarkersAction = authActionClient
-  .inputSchema(z.object({ groupId: z.string().optional().nullable() }))
+  .inputSchema(z.object({
+    groupId: z.string().optional().nullable(),
+    minLat: z.number().optional().nullable(),
+    maxLat: z.number().optional().nullable(),
+    minLng: z.number().optional().nullable(),
+    maxLng: z.number().optional().nullable(),
+  }))
   .action(async ({ parsedInput, ctx }) => {
-    const { groupId } = parsedInput;
+    const { groupId, minLat, maxLat, minLng, maxLng } = parsedInput;
+
+    const hasBounds = minLat != null && maxLat != null && minLng != null && maxLng != null;
 
     const userRestaurants = await prisma.userRestaurant.findMany({
       where: {
         userId: ctx.user.id,
         isBlacklisted: false,
-        ...(groupId
-          ? {
-              restaurant: {
-                groupRestaurants: { some: { groupId } },
-              },
-            }
-          : {}),
+        restaurant: {
+          ...(groupId ? { groupRestaurants: { some: { groupId } } } : {}),
+          ...(hasBounds ? {
+            latitude: { gte: minLat, lte: maxLat },
+            longitude: { gte: minLng, lte: maxLng },
+          } : {}),
+        },
       },
       select: {
         status: true,

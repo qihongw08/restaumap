@@ -11,15 +11,13 @@ import type { VisitLogMarker, VisitLogWithLocation } from "@/types/visit";
 import type { RestaurantWithDetails } from "@/types/restaurant";
 import { Loader2 } from "lucide-react";
 import { getVisitMarkersAction, getVisitsAction } from "@/app/actions/visits";
-import { getCuisinesAction, getRestaurantsAction } from "@/app/actions/restaurants";
+import { getCuisinesAction, getRestaurantsAction, getRestaurantMarkersAction } from "@/app/actions/restaurants";
 
 const EMPTY_ARRAY: any[] = [];
 
 const DEFAULT_CENTER = { lat: 40.7, lng: -74 };
 const DEFAULT_ZOOM = 10;
 const SELECTED_ZOOM = 15;
-
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 type Bounds = {
   south: number;
@@ -35,10 +33,10 @@ interface MapViewProps {
   selectedGroupId?: string | null;
   groupOptions?: Array<{ id: string; name: string }>;
   shareToken?: string | null;
-  /** Share pages pass full restaurant data; markers are derived from it */
   restaurants?: RestaurantWithDetails[];
   showPhotos?: boolean;
   currentUserId?: string | null;
+  initialHasLogs?: boolean;
 }
 
 export function MapView({
@@ -51,25 +49,15 @@ export function MapView({
   restaurants,
   showPhotos = true,
   currentUserId = null,
+  initialHasLogs = false,
 }: MapViewProps) {
-  const visitLogMarkers = visitLogMarkersProp;
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Derive markers from restaurants prop when markers aren't provided (share pages)
-  const markers: MarkerData[] = useMemo(() => {
-    if (markersProp && markersProp.length > 0) return markersProp;
-    if (restaurants) {
-      return restaurants.map((r) => ({
-        id: r.id,
-        name: r.name,
-        latitude: r.latitude,
-        longitude: r.longitude,
-        status: r.status,
-      }));
-    }
-    return [];
-  }, [markersProp, restaurants]);
+  const [markers, setMarkers] = useState<MarkerData[]>(markersProp ?? EMPTY_ARRAY);
+  const [logMarkers, setLogMarkers] = useState<VisitLogMarker[]>(visitLogMarkersProp ?? EMPTY_ARRAY);
+  const [isMarkersLoading, setIsMarkersLoading] = useState(false);
+  const [hasInitialFetchOccurred, setHasInitialFetchOccurred] = useState(false);
 
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<
     string | null
@@ -87,21 +75,18 @@ export function MapView({
     null,
   );
   const [appliedLogBounds, setAppliedLogBounds] = useState<Bounds | null>(null);
-  const [logMarkers, setLogMarkers] =
-    useState<VisitLogMarker[]>(visitLogMarkers);
 
-  // Sync state with props only when the prop reference actually changes
-  // and it's different from what we currently have.
   useEffect(() => {
-    setLogMarkers((current) => {
-      // Deep-ish comparison to avoid infinite loops if prop is unstable
-      if (current.length === visitLogMarkers.length &&
-          current.every((m, i) => m.id === visitLogMarkers[i]?.id)) {
-        return current;
-      }
-      return visitLogMarkers;
-    });
-  }, [visitLogMarkers]);
+    if (markersProp && markersProp.length > 0) {
+      setMarkers(markersProp);
+    }
+  }, [markersProp]);
+
+  useEffect(() => {
+    if (visitLogMarkersProp && visitLogMarkersProp.length > 0) {
+      setLogMarkers(visitLogMarkersProp);
+    }
+  }, [visitLogMarkersProp]);
 
   const markersInAppliedBounds = useMemo(() => {
     if (!appliedSpotsBounds) return markers;
@@ -163,7 +148,7 @@ export function MapView({
 
   const handleLogMarkerClick = useCallback(
     (restaurantId: string) => {
-      const marker = visitLogMarkers.find(
+      const marker = logMarkers.find(
         (v) => v.restaurantId === restaurantId,
       );
       if (marker) {
@@ -176,8 +161,23 @@ export function MapView({
       setSelectedLogRestaurantId(restaurantId);
       setSheetOpen(true);
     },
-    [visitLogMarkers],
+    [logMarkers],
   );
+
+  const handleSearchLogsHere = useCallback(async () => {
+    if (!bounds) return;
+    setAppliedLogBounds(bounds);
+    const res = await getVisitMarkersAction({
+      groupId: selectedGroupId,
+      minLat: bounds.south,
+      maxLat: bounds.north,
+      minLng: bounds.west,
+      maxLng: bounds.east,
+      limit: 200,
+    });
+    if (res?.serverError || res?.validationErrors || !res?.data) return;
+    setLogMarkers((res.data.data as VisitLogMarker[]) ?? []);
+  }, [bounds, selectedGroupId]);
 
   const handleCameraChange = useCallback(
     (ev: {
@@ -197,10 +197,6 @@ export function MapView({
 
   const handleSheetOpenChange = (open: boolean) => {
     setSheetOpen(open);
-    if (!open) {
-      setSelectedRestaurantId(null);
-      setSelectedLogRestaurantId(null);
-    }
   };
 
   const handleGroupChange = (nextGroupId: string) => {
@@ -257,25 +253,36 @@ export function MapView({
       bounds.west !== appliedSpotsBounds.west ||
       bounds.east !== appliedSpotsBounds.east);
 
-  const handleSearchSpotsHere = useCallback(() => {
+  const handleSearchSpotsHere = useCallback(async () => {
     if (!bounds) return;
     setAppliedSpotsBounds(bounds);
-  }, [bounds]);
-
-  const handleSearchLogsHere = useCallback(async () => {
-    if (!bounds) return;
-    setAppliedLogBounds(bounds);
-    const res = await getVisitMarkersAction({
-      groupId: selectedGroupId,
-      minLat: bounds.south,
-      maxLat: bounds.north,
-      minLng: bounds.west,
-      maxLng: bounds.east,
-      limit: 200,
-    });
-    if (res?.serverError || res?.validationErrors || !res?.data) return;
-    setLogMarkers((res.data.data as VisitLogMarker[]) ?? []);
+    setIsMarkersLoading(true);
+    try {
+      const res = await getRestaurantMarkersAction({
+        groupId: selectedGroupId,
+        minLat: bounds.south,
+        maxLat: bounds.north,
+        minLng: bounds.west,
+        maxLng: bounds.east,
+      });
+      if (res?.data) {
+        setMarkers(res.data);
+      }
+    } finally {
+      setIsMarkersLoading(false);
+    }
   }, [bounds, selectedGroupId]);
+
+  useEffect(() => {
+    if (bounds && !hasInitialFetchOccurred && markers.length === 0 && logMarkers.length === 0) {
+      setHasInitialFetchOccurred(true);
+      if (mapMode === "spots") {
+        handleSearchSpotsHere();
+      } else {
+        handleSearchLogsHere();
+      }
+    }
+  }, [bounds, hasInitialFetchOccurred, markers.length, logMarkers.length, mapMode, handleSearchSpotsHere, handleSearchLogsHere]);
 
   const handleRestaurantClick = useCallback(
     (id: string) => {
@@ -348,7 +355,7 @@ export function MapView({
               </div>
             )}
 
-            {visitLogMarkers.length > 0 && (
+            {(logMarkers.length > 0 || initialHasLogs) && (
               <div className="flex rounded-full bg-muted/50 p-0.5">
                 <button
                   type="button"
@@ -587,6 +594,8 @@ function LogsBottomSheet({
                       name: v.restaurant.name,
                     },
                   }}
+                  displayName={v.creator?.username ?? undefined}
+                  avatarUrl={v.creator?.avatarUrl ?? undefined}
                   editable={v.userId === currentUserId}
                 />
               </li>
