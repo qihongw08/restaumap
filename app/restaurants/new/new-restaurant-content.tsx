@@ -46,13 +46,18 @@ export function NewRestaurantContent() {
         name: query.trim(),
         addressOrRegion: "",
       });
-      if (res?.serverError) throw new Error(res.serverError);
+      if (res?.serverError) {
+        throw new Error("Google search failed: " + res.serverError);
+      }
       
       const next = (res?.data ?? []) as PlaceCandidate[];
+      if (next.length === 0) {
+        setError("Google search failed: No matches found.");
+      }
       setCandidates(next);
       if (next.length === 1) setSelectedPlaceId(next[0].placeId);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not search places");
+      setError(e instanceof Error ? e.message : "Google search failed");
       setCandidates([]);
       setSelectedPlaceId(null);
     } finally {
@@ -61,10 +66,17 @@ export function NewRestaurantContent() {
   };
 
   const handleSave = async () => {
-    const selected =
-      candidates.find((c) => c.placeId === selectedPlaceId) ??
-      (candidates.length === 1 ? candidates[0] : null);
-    if (!selected) return;
+    const selected = candidates.find((c) => c.placeId === (selectedPlaceId || (candidates.length === 1 ? candidates[0].placeId : null)));
+    if (!selected) {
+      setError("Please select a restaurant first");
+      return;
+    }
+
+    if (selected.latitude == null || selected.longitude == null) {
+      setError("Could not get coordinates for this restaurant");
+      return;
+    }
+
     setIsSaving(true);
     setError(null);
     try {
@@ -72,22 +84,19 @@ export function NewRestaurantContent() {
         name: selected.name,
         addressOrRegion: selected.formattedAddress ?? "",
       });
-      if (enrichRes?.serverError) {
-        throw new Error("Could not enrich restaurant details");
-      }
       
       const extracted = (enrichRes?.data ?? {}) as GroqExtracted;
 
       const res = await createRestaurantAction({
         name: selected.name,
-        address: selected.formattedAddress,
-        formattedAddress: selected.formattedAddress,
-        latitude: selected.latitude ?? null,
-        longitude: selected.longitude ?? null,
+        address: selected.formattedAddress || "Unknown Address",
+        formattedAddress: selected.formattedAddress || "Unknown Address",
+        latitude: selected.latitude,
+        longitude: selected.longitude,
         googlePlaceId: selected.placeId,
-        openingHoursWeekdayText: Array.isArray(extracted.openingHoursWeekdayText)
+        openingHoursWeekdayText: Array.isArray(extracted.openingHoursWeekdayText) && extracted.openingHoursWeekdayText.length > 0
           ? extracted.openingHoursWeekdayText
-          : [],
+          : ["Opening hours not available"],
         cuisineTypes: Array.isArray(extracted.cuisineTypes)
           ? extracted.cuisineTypes
           : [],
@@ -103,9 +112,10 @@ export function NewRestaurantContent() {
           : [],
       });
 
-      if (res?.serverError || res?.validationErrors) throw new Error("Failed to save restaurant");
+      if (res?.serverError || res?.validationErrors) {
+        throw new Error(res?.serverError || "Failed to save restaurant");
+      }
       
-      // @ts-ignore
       router.push(`/restaurants/${res.data?.id}`);
       router.refresh();
     } catch (e) {

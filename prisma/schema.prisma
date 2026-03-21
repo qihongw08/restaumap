@@ -18,33 +18,25 @@ model User {
 }
 
 model Restaurant {
-  id               String  @id @default(uuid())
-  name             String
-  address          String?
-  formattedAddress String? @map("formatted_address")
-  latitude         Float?
-  longitude        Float?
-
-  // Google Places (enriched from import)
-  googlePlaceId           String?  @unique @map("google_place_id")
-  openingHoursWeekdayText String[] @default([]) @map("opening_hours_weekday_text") // From Place Details opening_hours.weekday_text
-
-  // Extracted data
-  cuisineTypes  String[] @map("cuisine_types")
-  popularDishes String[] @map("popular_dishes")
-  priceRange    String?  @map("price_range") // $, $$, $$$, $$$$
-  ambianceTags  String[] @map("ambiance_tags")
-
-  // Metadata
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  // Relations
-  userRestaurants  UserRestaurant[]
-  visits           Visit[]
-  photos           Photo[]
-  imports          Import[]
-  groupRestaurants GroupRestaurant[]
+  id                      String            @id @default(uuid())
+  name                    String
+  address                 String
+  formattedAddress        String            @map("formatted_address")
+  latitude                Float
+  longitude               Float
+  googlePlaceId           String            @unique @map("google_place_id")
+  openingHoursWeekdayText String[]          @default([]) @map("opening_hours_weekday_text")
+  cuisineTypes            String[]          @map("cuisine_types")
+  popularDishes           String[]          @map("popular_dishes")
+  priceRange              String?           @map("price_range")
+  ambianceTags            String[]          @map("ambiance_tags")
+  createdAt               DateTime          @default(now()) @map("created_at")
+  updatedAt               DateTime          @updatedAt @map("updated_at")
+  groupRestaurants        GroupRestaurant[]
+  imports                 Import[]
+  photos                  Photo[]
+  userRestaurants         UserRestaurant[]
+  visits                  Visit[]
 
   @@map("restaurants")
 }
@@ -59,7 +51,7 @@ model UserRestaurant {
   blacklistedAt   DateTime?        @map("blacklisted_at")
   savedAt         DateTime         @default(now()) @map("saved_at")
   sourceUrl       String?          @map("source_url")
-  sourcePlatform  String?          @map("source_platform") // instagram, rednote, tiktok
+  sourcePlatform  String?          @map("source_platform")
   rawCaption      String?          @map("raw_caption")
   restaurant      Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
@@ -73,9 +65,9 @@ model Group {
   createdById      String            @map("created_by_id")
   createdAt        DateTime          @default(now()) @map("created_at")
   updatedAt        DateTime          @updatedAt @map("updated_at")
+  invites          GroupInvite[]
   members          GroupMember[]
   groupRestaurants GroupRestaurant[]
-  invites          GroupInvite[]
   shareLinks       ShareLink[]
   visits           Visit[]
 
@@ -87,8 +79,8 @@ model GroupMember {
   groupId   String   @map("group_id")
   userId    String   @map("user_id")
   role      String   @default("member")
-  sortOrder Int      @default(0) @map("sort_order")
   joinedAt  DateTime @default(now()) @map("joined_at")
+  sortOrder Int      @default(0) @map("sort_order")
   group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@unique([groupId, userId])
@@ -122,10 +114,10 @@ model GroupInvite {
 
 model Import {
   id           String     @id @default(uuid())
-  userId       String     @map("user_id")
-  sourceUrl    String?    @map("source_url") // Original link user pasted (null if caption-only)
+  sourceUrl    String?    @map("source_url")
   importedAt   DateTime   @default(now()) @map("imported_at")
   restaurantId String     @map("restaurant_id")
+  userId       String     @map("user_id")
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   @@map("imports")
@@ -142,47 +134,41 @@ model ShareLink {
   createdAt     DateTime      @default(now()) @map("created_at")
   targetGroup   Group?        @relation(fields: [targetGroupId], references: [id], onDelete: Cascade)
 
-  @@index([expiresAt], map: "share_links_expires_at_idx")
-  @@index([targetUserId], map: "share_links_target_user_id_idx")
-  @@index([targetGroupId], map: "share_links_target_group_id_idx")
+  @@index([expiresAt])
+  @@index([targetUserId])
+  @@index([targetGroupId])
   @@map("share_links")
 }
 
 model Visit {
-  id           String     @id @default(uuid())
-  userId       String     @map("user_id")
-  restaurantId String     @map("restaurant_id")
-  groupId      String?    @map("group_id")
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  group        Group?     @relation(fields: [groupId], references: [id], onDelete: SetNull)
-
-  visitDate DateTime @map("visit_date")
-
-  fullnessScore Int   @map("fullness_score")
-  tasteScore    Int   @map("taste_score")
-  pricePaid     Float @map("price_paid")
-
-  notes String?
-
-  photos Photo[]
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id            String     @id @default(uuid())
+  restaurantId  String     @map("restaurant_id")
+  visitDate     DateTime   @map("visit_date")
+  fullnessScore Int        @map("fullness_score")
+  tasteScore    Int        @map("taste_score")
+  pricePaid     Float      @map("price_paid")
+  notes         String?
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  userId        String     @map("user_id")
+  groupId       String?    @map("group_id")
+  photos        Photo[]
+  group         Group?     @relation(fields: [groupId], references: [id])
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   @@map("visits")
 }
 
 model Photo {
   id           String     @id @default(uuid())
-  userId       String     @map("user_id")
   restaurantId String     @map("restaurant_id")
+  url          String
+  caption      String?
+  uploadedAt   DateTime   @default(now()) @map("uploaded_at")
+  userId       String     @map("user_id")
   visitId      String?    @map("visit_id")
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   visit        Visit?     @relation(fields: [visitId], references: [id], onDelete: Cascade)
-
-  url        String
-  caption    String?
-  uploadedAt DateTime @default(now()) @map("uploaded_at")
 
   @@map("photos")
 }

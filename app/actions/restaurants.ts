@@ -8,12 +8,14 @@ import type { RestaurantStatus } from "@prisma/client";
 
 const createRestaurantSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  address: z.string().nullable().optional(),
-  formattedAddress: z.string().nullable().optional(),
-  latitude: z.number().nullable().optional(),
-  longitude: z.number().nullable().optional(),
-  googlePlaceId: z.string().nullable().optional(),
-  openingHoursWeekdayText: z.array(z.string()).optional(),
+  address: z.string().min(1, "Address is required"),
+  formattedAddress: z.string().min(1, "Formatted address is required"),
+  latitude: z.number(),
+  longitude: z.number(),
+  googlePlaceId: z.string().min(1, "Google Place ID is required"),
+  openingHoursWeekdayText: z
+    .array(z.string())
+    .min(1, "Opening hours are required"),
   cuisineTypes: z.array(z.string()).optional(),
   popularDishes: z.array(z.string()).optional(),
   priceRange: z.string().nullable().optional(),
@@ -106,95 +108,73 @@ export const createRestaurantAction = authMutationClient
 const importRestaurantSchema = z.object({
   sourceUrl: z.string().nullable().optional(),
   sourcePlatform: z.string().nullable().optional(),
-  name: z.string().optional().nullable(),
-  address: z.string().optional().nullable(),
-  formattedAddress: z.string().optional().nullable(),
-  latitude: z.number().optional().nullable(),
-  longitude: z.number().optional().nullable(),
-  placeId: z.string().optional().nullable(),
-  extracted: z.object({
-    name: z.string().optional().nullable(),
-    address: z.string().optional().nullable(),
-    formattedAddress: z.string().optional().nullable(),
-    cuisineTypes: z.array(z.string()).optional(),
-    popularDishes: z.array(z.string()).optional(),
-    priceRange: z.string().optional().nullable(),
-    ambianceTags: z.array(z.string()).optional(),
-    openingHoursWeekdayText: z.array(z.string()).optional(),
-    rawCaption: z.string().optional().nullable(),
-  }).optional().default({}),
+  rawCaption: z.string().nullable().optional(),
+  placeId: z.string().min(1, "Google Place ID is required"),
+  name: z.string().min(1, "Name is required"),
+  address: z.string().min(1, "Address is required"),
+  formattedAddress: z.string().min(1, "Formatted address is required"),
+  latitude: z.number(),
+  longitude: z.number(),
+  openingHoursWeekdayText: z.array(z.string()).min(1, "Opening hours are required"),
+  cuisineTypes: z.array(z.string()).optional(),
+  popularDishes: z.array(z.string()).optional(),
+  priceRange: z.string().nullable().optional(),
+  ambianceTags: z.array(z.string()).optional(),
 });
 
 export const importRestaurantAction = authMutationClient
   .inputSchema(importRestaurantSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const { sourceUrl, sourcePlatform, placeId, extracted } = parsedInput;
+    const {
+      sourceUrl, sourcePlatform, rawCaption,
+      placeId, name, address, formattedAddress,
+      latitude, longitude,
+      openingHoursWeekdayText,
+      cuisineTypes = [], popularDishes = [], priceRange = null, ambianceTags = [],
+    } = parsedInput;
 
-    const name = (parsedInput.name?.trim() || null) ?? extracted.name ?? "Unknown";
-    const address = (parsedInput.address?.trim() || null) ?? extracted.address ?? null;
-    const rawCaption = extracted.rawCaption ?? null;
-    const cuisineTypes = extracted.cuisineTypes ?? [];
-    const popularDishes = extracted.popularDishes ?? [];
-    const priceRange = extracted.priceRange ?? null;
-    const ambianceTags = extracted.ambianceTags ?? [];
-
-    const rawFormatted = parsedInput.formattedAddress ?? extracted.formattedAddress ?? address;
-    const formattedAddress = rawFormatted ?? null;
-    const latitude = parsedInput.latitude ?? null;
-    const longitude = parsedInput.longitude ?? null;
-    const googlePlaceId = placeId?.trim() || null;
-    const openingHoursWeekdayText = extracted.openingHoursWeekdayText ?? [];
+    const googlePlaceId = placeId.trim();
 
     let restaurantId: string;
 
-    if (googlePlaceId) {
-      const existing = await prisma.restaurant.findUnique({
-        where: { googlePlaceId },
-      });
+    const existing = await prisma.restaurant.findUnique({
+      where: { googlePlaceId },
+    });
 
-      if (existing) {
-        restaurantId = existing.id;
+    if (existing) {
+      restaurantId = existing.id;
 
-        const needsCoords =
-          latitude != null && longitude != null && (existing.latitude == null || existing.longitude == null);
+      const needsCoords =
+        latitude != null && longitude != null && (existing.latitude == null || existing.longitude == null);
 
-        const needsOpeningHours =
-          openingHoursWeekdayText.length > 0 && (existing.openingHoursWeekdayText?.length ?? 0) === 0;
+      const needsOpeningHours =
+        openingHoursWeekdayText.length > 0 && (existing.openingHoursWeekdayText?.length ?? 0) === 0;
 
-        const needsName = !!name && name !== existing.name;
-        const needsAddress = address != null && address !== existing.address;
-        const needsFormattedAddress =
-          formattedAddress != null && formattedAddress !== existing.formattedAddress;
+      const needsName = !!name && name !== existing.name;
+      const needsAddress = address != null && address !== existing.address;
+      const needsFormattedAddress =
+        formattedAddress != null && formattedAddress !== existing.formattedAddress;
 
-        const needsUpdate = needsOpeningHours || needsCoords || needsName || needsAddress || needsFormattedAddress;
+      const needsUpdate = needsOpeningHours || needsCoords || needsName || needsAddress || needsFormattedAddress;
 
-        if (needsUpdate) {
-          await prisma.restaurant.update({
-            where: { id: existing.id },
-            data: {
-              ...(needsOpeningHours ? { openingHoursWeekdayText } : {}),
-              ...(needsCoords && latitude != null && longitude != null ? { latitude, longitude } : {}),
-              ...(needsName ? { name } : {}),
-              ...(needsAddress ? { address } : {}),
-              ...(needsFormattedAddress ? { formattedAddress } : {}),
-            },
-          });
-        }
-      } else {
-        const created = await prisma.restaurant.create({
+      if (needsUpdate) {
+        await prisma.restaurant.update({
+          where: { id: existing.id },
           data: {
-            name, address, formattedAddress, latitude, longitude,
-            googlePlaceId, openingHoursWeekdayText, cuisineTypes,
-            popularDishes, priceRange, ambianceTags,
+            ...(needsOpeningHours ? { openingHoursWeekdayText } : {}),
+            ...(needsCoords && latitude != null && longitude != null ? { latitude, longitude } : {}),
+            ...(needsName ? { name } : {}),
+            ...(needsAddress ? { address } : {}),
+            ...(needsFormattedAddress ? { formattedAddress } : {}),
           },
         });
-        restaurantId = created.id;
       }
     } else {
       const created = await prisma.restaurant.create({
         data: {
           name, address, formattedAddress, latitude, longitude,
-          cuisineTypes, popularDishes, priceRange, ambianceTags, openingHoursWeekdayText,
+          googlePlaceId, openingHoursWeekdayText, cuisineTypes,
+          popularDishes, priceRange, ambianceTags,
         },
       });
       restaurantId = created.id;
@@ -406,8 +386,8 @@ const updateRestaurantSchema = z.object({
   name: z.string().optional(),
   address: z.string().optional(),
   formattedAddress: z.string().optional(),
-  latitude: z.number().optional().nullable(),
-  longitude: z.number().optional().nullable(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
   cuisineTypes: z.array(z.string()).optional(),
   popularDishes: z.array(z.string()).optional(),
   priceRange: z.string().optional().nullable(),

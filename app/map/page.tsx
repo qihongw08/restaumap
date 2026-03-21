@@ -89,7 +89,6 @@ export default async function MapPage({
       prisma.visit.findMany({
         where: {
           ...(groupId ? { groupId } : { userId: user.id }),
-          restaurant: { latitude: { not: null }, longitude: { not: null } },
         },
         select: {
           id: true,

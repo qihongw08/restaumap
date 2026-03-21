@@ -126,35 +126,35 @@ export function ImportContent({
         selectedPlaceId && candidates.length > 0
           ? (candidates.find((c) => c.placeId === selectedPlaceId) ??
             (candidates.length === 1 ? candidates[0] : null))
+          : candidates.length === 1
+          ? candidates[0]
           : null;
 
-      const payload: Record<string, unknown> = {
-        sourceUrl,
-        placeId: selectedPlaceId ?? undefined,
-        extracted: {
-          name: selectedCandidate?.name,
-          address: selectedCandidate?.formattedAddress ?? extracted.address,
-          formattedAddress: selectedCandidate?.formattedAddress,
-          openingHoursWeekdayText: extracted.openingHoursWeekdayText ?? [],
-          cuisineTypes: extracted.cuisineTypes ?? [],
-          popularDishes: extracted.popularDishes ?? [],
-          priceRange: extracted.priceRange,
-          ambianceTags: extracted.ambianceTags ?? [],
-        },
-      };
-      if (selectedCandidate) {
-        if (selectedCandidate.name) payload.name = selectedCandidate.name;
-        if (selectedCandidate.formattedAddress) {
-          payload.formattedAddress = selectedCandidate.formattedAddress;
-          payload.address = selectedCandidate.formattedAddress;
-        }
-        if (typeof selectedCandidate.latitude === "number")
-          payload.latitude = selectedCandidate.latitude;
-        if (typeof selectedCandidate.longitude === "number")
-          payload.longitude = selectedCandidate.longitude;
+      if (!selectedCandidate) {
+        setError("Please select a restaurant from the list before saving.");
+        return;
+      }
+      if (selectedCandidate.latitude == null || selectedCandidate.longitude == null) {
+        setError("Could not get coordinates for this restaurant.");
+        return;
       }
 
-      const res = await importRestaurantAction(payload);
+      const res = await importRestaurantAction({
+        sourceUrl,
+        placeId: selectedCandidate.placeId,
+        name: selectedCandidate.name,
+        address: selectedCandidate.formattedAddress,
+        formattedAddress: selectedCandidate.formattedAddress,
+        latitude: selectedCandidate.latitude,
+        longitude: selectedCandidate.longitude,
+        openingHoursWeekdayText: extracted.openingHoursWeekdayText?.length
+          ? extracted.openingHoursWeekdayText
+          : ["Opening hours not available"],
+        cuisineTypes: extracted.cuisineTypes ?? [],
+        popularDishes: extracted.popularDishes ?? [],
+        priceRange: extracted.priceRange,
+        ambianceTags: extracted.ambianceTags ?? [],
+      });
       if (res?.serverError || res?.validationErrors) throw new Error("Failed to save restaurant");
       setExtracted(null);
       setPlacesCandidates(null);

@@ -32,11 +32,11 @@ function mapToSharedRestaurant(
   base: {
     id: string;
     name: string;
-    address: string | null;
-    formattedAddress: string | null;
-    latitude: number | null;
-    longitude: number | null;
-    googlePlaceId: string | null;
+    address: string;
+    formattedAddress: string;
+    latitude: number;
+    longitude: number;
+    googlePlaceId: string;
     openingHoursWeekdayText: string[];
     cuisineTypes: string[];
     popularDishes: string[];

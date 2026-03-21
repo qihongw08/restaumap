@@ -33,6 +33,8 @@ export function QuickLogVisit({
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<
     string | null
   >(null);
@@ -42,13 +44,18 @@ export function QuickLogVisit({
     if (!q) return;
     setSearching(true);
     setResults([]);
+    setError(null);
+    setHasSearched(true);
 
     try {
       if (mode === "addOnly") {
         let googleResults: SearchResult[] = [];
+        let googleFailed = false;
         try {
           const placesRes = await searchPlacesAction({ name: q, addressOrRegion: "" });
-          if (!placesRes?.serverError) {
+          if (placesRes?.serverError) {
+            googleFailed = true;
+          } else {
             googleResults = (placesRes?.data ?? []).map((p: any) => ({
               id: p.placeId,
               name: p.name,
@@ -59,7 +66,12 @@ export function QuickLogVisit({
               googlePlaceId: p.placeId,
             }));
           }
-        } catch {}
+        } catch {
+          googleFailed = true;
+        }
+        if (googleFailed) {
+          setError("Google search failed. Please try again.");
+        }
         setResults(googleResults);
         return;
       }
@@ -89,7 +101,9 @@ export function QuickLogVisit({
       let googleResults: SearchResult[] = [];
       try {
         const placesRes = await searchPlacesAction({ name: q, addressOrRegion: "" });
-        if (!placesRes?.serverError) {
+        if (placesRes?.serverError) {
+          setError("Google search failed — showing saved results only.");
+        } else {
           googleResults = (placesRes?.data ?? [])
             .filter((p: any) => !dedupedSaved.some((s) => s.googlePlaceId && s.googlePlaceId === p.placeId))
             .map((p: any) => ({
@@ -102,9 +116,10 @@ export function QuickLogVisit({
               googlePlaceId: p.placeId,
             }));
         }
-      } catch {}
-      // Google search failed, continue with saved results only
-      
+      } catch {
+        setError("Google search failed — showing saved results only.");
+      }
+
       setResults([...dedupedSaved, ...googleResults]);
     } finally {
       setSearching(false);
@@ -131,29 +146,43 @@ export function QuickLogVisit({
       });
       const enriched: any = enrichRes?.data ?? {};
 
+      if (result.latitude == null || result.longitude == null) {
+        throw new Error("Could not get coordinates for this restaurant");
+      }
+
       const createRes = await createRestaurantAction({
         name: result.name,
-        formattedAddress: result.address,
+        address: result.address || "Unknown Address",
+        formattedAddress: result.address || "Unknown Address",
         googlePlaceId: result.googlePlaceId,
-        latitude: result.latitude ?? null,
-        longitude: result.longitude ?? null,
-        openingHoursWeekdayText: Array.isArray(enriched.openingHoursWeekdayText) ? enriched.openingHoursWeekdayText : [],
-        cuisineTypes: Array.isArray(enriched.cuisineTypes) ? enriched.cuisineTypes : [],
-        popularDishes: Array.isArray(enriched.popularDishes) ? enriched.popularDishes : [],
-        priceRange: typeof enriched.priceRange === "string" ? enriched.priceRange : null,
-        ambianceTags: Array.isArray(enriched.ambianceTags) ? enriched.ambianceTags : [],
+        latitude: result.latitude,
+        longitude: result.longitude,
+        openingHoursWeekdayText:
+          Array.isArray(enriched.openingHoursWeekdayText) &&
+          enriched.openingHoursWeekdayText.length > 0
+            ? enriched.openingHoursWeekdayText
+            : ["Opening hours not available"],
+        cuisineTypes: Array.isArray(enriched.cuisineTypes)
+          ? enriched.cuisineTypes
+          : [],
+        popularDishes: Array.isArray(enriched.popularDishes)
+          ? enriched.popularDishes
+          : [],
+        priceRange:
+          typeof enriched.priceRange === "string" ? enriched.priceRange : null,
+        ambianceTags: Array.isArray(enriched.ambianceTags)
+          ? enriched.ambianceTags
+          : [],
         status: mode === "addOnly" ? "WANT_TO_GO" : "VISITED",
       });
 
       if (!createRes?.serverError && !createRes?.validationErrors) {
         if (mode === "addOnly") {
           onClose();
-          // @ts-ignore
           router.push(`/restaurants/${createRes.data?.id}`);
           router.refresh();
         } else {
-          // @ts-ignore
-          setSelectedRestaurantId(createRes.data?.id);
+          setSelectedRestaurantId(createRes.data?.id ?? null);
         }
       }
     } finally {
@@ -218,6 +247,12 @@ export function QuickLogVisit({
           </button>
         </form>
 
+        {error && (
+          <p className="text-sm font-bold text-destructive text-center py-2">
+            {error}
+          </p>
+        )}
+
         {saving && (
           <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -270,7 +305,12 @@ export function QuickLogVisit({
           </ul>
         )}
 
-        {!searching && results.length === 0 && query.trim() && (
+        {!searching && hasSearched && results.length === 0 && !error && (
+          <p className="py-4 text-center text-sm text-muted-foreground">
+            No results found.
+          </p>
+        )}
+        {!searching && !hasSearched && (
           <p className="py-4 text-center text-sm text-muted-foreground">
             Type a restaurant name and hit Search
           </p>

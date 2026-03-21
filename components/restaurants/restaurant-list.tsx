@@ -9,6 +9,8 @@ import type { RestaurantWithVisits } from "@/types/restaurant";
 import { Loader2 } from "lucide-react";
 import { useLocation } from "@/hooks/use-location";
 import { deleteRestaurantAction, getRestaurantsAction } from "@/app/actions/restaurants";
+import { Modal } from "@/components/ui/modal";
+import { ImportContent } from "@/app/import/import-content";
 
 interface RestaurantListProps {
   status?: string;
@@ -31,6 +33,7 @@ export function RestaurantList({
 
   const [extraRestaurants, setExtraRestaurants] = useState<RestaurantWithVisits[]>([]);
   const [cursor, setCursor] = useState<string | null>(initialCursor);
+  const [importOpen, setImportOpen] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -158,16 +161,30 @@ export function RestaurantList({
   }
   if (restaurants.length === 0) {
     return (
-      <div className="rounded-2xl border-2 border-muted bg-muted/30 px-10 py-12 text-center text-muted-foreground">
-        <p className="font-bold text-foreground">No restaurants yet.</p>
-        <p className="mt-2 text-sm">
-          Add one via{" "}
-          <a href="/import" className="text-primary underline font-bold">
-            Import
-          </a>
-          .
-        </p>
-      </div>
+      <>
+        <div className="rounded-2xl border-2 border-muted bg-muted/30 px-10 py-12 text-center text-muted-foreground">
+          <p className="font-bold text-foreground">No restaurants yet.</p>
+          <p className="mt-2 text-sm">
+            Add one via{" "}
+            <button
+              type="button"
+              onClick={() => setImportOpen(true)}
+              className="text-primary underline font-bold"
+            >
+              Import
+            </button>
+            .
+          </p>
+        </div>
+        <Modal
+          open={importOpen}
+          onClose={() => setImportOpen(false)}
+          title="Import restaurant"
+          className="max-w-lg"
+        >
+          <ImportContent variant="modal" onClose={() => setImportOpen(false)} />
+        </Modal>
+      </>
     );
   }
 

@@ -219,8 +219,6 @@ export const getVisitMarkersAction = authActionClient
         ],
         ...(groupId ? { groupId } : {}),
         restaurant: {
-          latitude: { not: null },
-          longitude: { not: null },
           ...(hasBounds ? {
             latitude: { gte: minLat, lte: maxLat },
             longitude: { gte: minLng, lte: maxLng },
